@@ -1,5 +1,7 @@
 # VoiceRecorder
 
+![Screenshot of the application](Screenshots/Screen.png)
+
 ## Description
 
 VoiceRecorder is an user-friendly application designed to record audio from selected devices. It's perfect for quick recordings and  audio testing.
