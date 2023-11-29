@@ -23,14 +23,6 @@ H
 VoiceRecorder/Program.cs,3\2\3249ac81ec15e0b9044622b8d2e14a6e50214bfa
 W
 'VoiceRecorder/Views/MainWindow.axaml.cs,6\e\6e81a7b345cfad543287bec16d5c2e3aff53212d
-e
-5VoiceRecorder/Filters/CompressorMainFilterStrategy.cs,0\d\0d2f9c98274f60214a13fb06ec2d47f7c76c27fb
-_
-/VoiceRecorder/Filters/EchoMainFilterStrategy.cs,8\5\85339646198dc398badcc205068f980c2dc042e1
-a
-1VoiceRecorder/Filters/ChorusMainFilterStrategy.cs,9\b\9bc95d9728d4009d03cb6367a4e26b7dd8fc9ec2
-g
-7VoiceRecorder/Filters/Interfaces/IMainFilterStrategy.cs,a\9\a9d41924b4e881a552b8f68433a3a52559ab7fbb
 G
 VoiceRecorder/App.axaml,b\6\b6677b329f0ca2faa36ea4d2d3658796f9588577
 J

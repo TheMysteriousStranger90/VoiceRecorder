@@ -29,3 +29,7 @@ Bohdan Harabadzhyu
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## SourceForge
+
+[![Download VoiceRecorder](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/voice-recorder-stranger90/files/latest/download)
