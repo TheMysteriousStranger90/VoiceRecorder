@@ -1,0 +1,49 @@
+﻿<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <!-- Add Controls for Previewer Here -->
+        </Border>
+    </Design.PreviewWith>
+
+    <!-- Add Styles Here -->
+    <Style Selector="Button">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="BorderThickness" Value="3" />
+        <Setter Property="Background" Value="#80F" />
+        <Setter Property="BorderBrush" Value="#214" />
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    
+    <Style Selector="ProgressBar#RecordingProgressBar">
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="Width" Value="800"/>
+        <Setter Property="Foreground" Value="#80F"/>
+        <Setter Property="Background" Value="#214"/>
+        <Setter Property="BorderBrush" Value="Black"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    
+    <Style Selector="Label#TimerLabel">
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="Foreground" Value="#80F"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontStyle" Value="Italic"/>
+        <Setter Property="Padding" Value="10"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="BorderBrush" Value="Black"/>
+    </Style>
+    
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="#214"/>
+        <Setter Property="Foreground" Value="#80F"/>
+        <Setter Property="BorderBrush" Value="Black"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="Padding" Value="10"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="FontFamily" Value="Calisto"/>
+    </Style>
+</Styles>
