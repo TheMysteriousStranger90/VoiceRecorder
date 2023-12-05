@@ -190,3 +190,4 @@ C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\bin\Debug\net7.0\SkiaSha
 C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\bin\Debug\net7.0\Svg.Custom.dll
 C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\bin\Debug\net7.0\Svg.Model.dll
 C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\bin\Debug\net7.0\Svg.Skia.dll
+C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\obj\Debug\net7.0\VoiceRecorder.sourcelink.json
