@@ -10,6 +10,8 @@
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+        <ApplicationIcon>./Assets/icon.ico</ApplicationIcon>
     </PropertyGroup>
     
     <ItemGroup>
