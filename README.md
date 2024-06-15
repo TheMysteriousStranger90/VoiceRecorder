@@ -1,6 +1,6 @@
 # VoiceRecorder
 
-![Screenshot of the application](Screenshots/Screen.png)
+![Screenshot of the application](Screenshots/Screen1.png)
 
 ## Description
 
