@@ -1,53 +1,55 @@
-﻿using CSCore;
+﻿using System;
+using CSCore;
 using CSCore.Codecs.WAV;
-using CSCore.SoundIn;
-using System;
 using CSCore.CoreAudioAPI;
+using CSCore.SoundIn;
 using CSCore.Streams;
 using VoiceRecorder.Filters.Interfaces;
 
-public class AudioRecorder : IDisposable
-{
-    private WasapiCapture capture;
-    private WaveWriter writer;
-    private bool disposed = false;
-    private SoundInSource soundInSource;
+namespace VoiceRecorder.Models;
 
-    public IWaveSource CaptureSource => soundInSource;
+public sealed class AudioRecorder : IDisposable
+{
+    private WasapiCapture _capture;
+    private WaveWriter _writer;
+    private bool _disposed = false;
+    private SoundInSource _soundInSource;
+
+    public IWaveSource CaptureSource => _soundInSource;
 
     public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter filter)
     {
         try
         {
-            capture = new WasapiCapture();
-            capture.Device = device;
-            capture.Initialize();
+            _capture = new WasapiCapture();
+            _capture.Device = device;
+            _capture.Initialize();
 
-            soundInSource = new SoundInSource(capture) { FillWithZeros = false };
+            _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
 
             IWaveSource filteredSource;
             if (filter != null)
             {
-                filteredSource = filter.ApplyFilter((IWaveSource)soundInSource);
+                filteredSource = filter.ApplyFilter((IWaveSource)_soundInSource);
             }
             else
             {
-                filteredSource = soundInSource;
+                filteredSource = _soundInSource;
             }
 
-            writer = new WaveWriter(outputFilePath, filteredSource.WaveFormat);
+            _writer = new WaveWriter(outputFilePath, filteredSource.WaveFormat);
 
             byte[] buffer = new byte[filteredSource.WaveFormat.BytesPerSecond / 2];
-            capture.DataAvailable += (s, e) =>
+            _capture.DataAvailable += (s, e) =>
             {
                 int read;
                 while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    writer.Write(buffer, 0, read);
+                    _writer.Write(buffer, 0, read);
                 }
             };
 
-            capture.Start();
+            _capture.Start();
         }
         catch (Exception ex)
         {
@@ -59,8 +61,8 @@ public class AudioRecorder : IDisposable
     {
         try
         {
-            capture.Stop();
-            writer.Dispose();
+            _capture.Stop();
+            _writer.Dispose();
         }
         catch (Exception ex)
         {
@@ -70,13 +72,13 @@ public class AudioRecorder : IDisposable
 
     public void UpdateSource(IWaveSource newSource)
     {
-        capture.Stop();
+        _capture.Stop();
 
-        soundInSource = newSource as SoundInSource;
+        _soundInSource = newSource as SoundInSource;
 
-        if (soundInSource != null)
+        if (_soundInSource != null)
         {
-            capture.Start();
+            _capture.Start();
         }
         else
         {
@@ -84,26 +86,26 @@ public class AudioRecorder : IDisposable
         }
     }
 
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
-        if (!disposed)
+        if (!_disposed)
         {
             if (disposing)
             {
-                if (capture != null)
+                if (_capture != null)
                 {
-                    capture.Dispose();
-                    capture = null;
+                    _capture.Dispose();
+                    _capture = null;
                 }
 
-                if (writer != null)
+                if (_writer != null)
                 {
-                    writer.Dispose();
-                    writer = null;
+                    _writer.Dispose();
+                    _writer = null;
                 }
             }
 
-            disposed = true;
+            _disposed = true;
         }
     }
 

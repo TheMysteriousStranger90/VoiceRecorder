@@ -13,15 +13,15 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = VoiceRecorder
-build_property.ProjectDir = C:\Users\User\RiderProjects\VoiceRecorder\VoiceRecorder\
+build_property.ProjectDir = D:\MyProjects\VoiceRecorder\VoiceRecorder\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 
-[C:/Users/User/RiderProjects/VoiceRecorder/VoiceRecorder/App.axaml]
+[D:/MyProjects/VoiceRecorder/VoiceRecorder/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/User/RiderProjects/VoiceRecorder/VoiceRecorder/Styles/Styles.axaml]
+[D:/MyProjects/VoiceRecorder/VoiceRecorder/Styles/Styles.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/User/RiderProjects/VoiceRecorder/VoiceRecorder/Views/MainWindow.axaml]
+[D:/MyProjects/VoiceRecorder/VoiceRecorder/Views/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

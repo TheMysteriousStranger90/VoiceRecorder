@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VoiceRecorder")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a411017632da02850f7d052eda7133327b42668d")]
 [assembly: System.Reflection.AssemblyProductAttribute("VoiceRecorder")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VoiceRecorder")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -2,15 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Reactive.Linq;
-using System.Threading;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
 using Avalonia.Threading;
-using ReactiveUI;
+using VoiceRecorder.Models;
 using VoiceRecorder.ViewModels;
 
 namespace VoiceRecorder.Views;
@@ -19,15 +15,15 @@ public partial class MainWindow : Window
 {
     private MainWindowViewModel viewModel => (MainWindowViewModel)DataContext;
     public AudioRecorder Recorder { get; set; }
-    public AudioDevice Device { get; set; }
-    public VoiceFilterViewModel FilterViewModel { get; set; }
+    private AudioDevice Device { get; set; }
+    private VoiceFilterViewModel FilterViewModel { get; set; }
 
     public List<string> AvailableDevices => Device.GetAvailableDevices();
 
-    private DispatcherTimer timer;
-    private TimeSpan time;
+    private readonly DispatcherTimer _timer;
+    private TimeSpan _time;
 
-    private TextBlock buttonTextBlock;
+    private readonly TextBlock _buttonTextBlock;
 
     public MainWindow()
     {
@@ -36,12 +32,12 @@ public partial class MainWindow : Window
         Recorder = new AudioRecorder();
         Device = new AudioDevice();
 
-        timer = new DispatcherTimer();
-        timer.Interval = TimeSpan.FromSeconds(1);
-        timer.Tick += Timer_Tick;
-        time = TimeSpan.Zero;
+        _timer = new DispatcherTimer();
+        _timer.Interval = TimeSpan.FromSeconds(1);
+        _timer.Tick += Timer_Tick;
+        _time = TimeSpan.Zero;
 
-        this.buttonTextBlock = this.FindControl<TextBlock>("StopButtonTextBlock") ??
+        this._buttonTextBlock = this.FindControl<TextBlock>("StopButtonTextBlock") ??
                                throw new Exception("Cannot find text block");
     }
 
@@ -51,13 +47,13 @@ public partial class MainWindow : Window
         {
             Console.WriteLine("Timer ticked.");
 
-            time = time.Add(TimeSpan.FromSeconds(1));
+            _time = _time.Add(TimeSpan.FromSeconds(1));
             var timerLabel = this.FindControl<Label>("TimerLabel");
             var progressBar = this.FindControl<ProgressBar>("RecordingProgressBar");
 
             if (progressBar != null && timerLabel != null)
             {
-                timerLabel.Content = time.ToString(@"hh\:mm\:ss");
+                timerLabel.Content = _time.ToString(@"hh\:mm\:ss");
                 progressBar.Value += 1;
                 if (progressBar.Value >= progressBar.Maximum)
                 {
@@ -85,10 +81,16 @@ public partial class MainWindow : Window
 
                 viewModel.StartRecording(selectedDevice, FilterViewModel);
 
-                time = TimeSpan.Zero;
-                timer.Start();
+                _time = TimeSpan.Zero;
+                _timer.Start();
+                
+                var progressBar = this.FindControl<ProgressBar>("RecordingProgressBar");
+                if (progressBar != null)
+                {
+                    progressBar.Value = progressBar.Minimum;
+                }
 
-                this.buttonTextBlock.Text = $"Recording started.";
+                this._buttonTextBlock.Text = $"Recording started.";
                 deviceList.IsEnabled = false;
             }
             else
@@ -116,8 +118,8 @@ public partial class MainWindow : Window
                 deviceList.IsEnabled = true;
             }
 
-            timer.Stop();
-            this.buttonTextBlock.Text = $"Recording saved.";
+            _timer.Stop();
+            this._buttonTextBlock.Text = $"Recording saved.";
         }
         catch (Exception ex)
         {
@@ -142,7 +144,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                this.buttonTextBlock.Text = "The folder does not exist.";
+                this._buttonTextBlock.Text = "The folder does not exist.";
             }
         }
         catch (Exception ex)

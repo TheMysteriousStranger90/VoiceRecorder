@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.IO;
 using ReactiveUI;
 using VoiceRecorder.Filters;
+using VoiceRecorder.Models;
 
 namespace VoiceRecorder.ViewModels
 {
     public class MainWindowViewModel : ViewModelBase
     {
         public bool IsFilterApplied { get; set; }
-        public AudioRecorder Recorder { get; set; }
-        public AudioDevice Device { get; set; }
+        private AudioRecorder Recorder { get; set; }
+        private AudioDevice Device { get; set; }
 
         public List<VoiceFilterViewModel> AvailableFilters { get; set; }
         public VoiceFilterViewModel SelectedFilterViewModel { get; set; }
@@ -50,9 +51,11 @@ namespace VoiceRecorder.ViewModels
             {
                 new VoiceFilterViewModel(null, null),
                 new VoiceFilterViewModel(null, new EchoFilter()),
-                new VoiceFilterViewModel(null, new ChorusFilter()),
-                new VoiceFilterViewModel(null, new CompressorFilter())
+                new VoiceFilterViewModel(null, new FlangerFilter()),
+                new VoiceFilterViewModel(null, new DistortionFilter())
             };
+
+            SelectedFilterViewModel = AvailableFilters[0];
         }
 
         public void StartRecording(string deviceName, VoiceFilterViewModel filterViewModel)
@@ -69,9 +72,9 @@ namespace VoiceRecorder.ViewModels
 
             var device = Device.SelectDevice(deviceName);
 
-            if (filterViewModel != null && filterViewModel.filterStrategy != null)
+            if (filterViewModel != null && filterViewModel.FilterStrategy != null)
             {
-                Recorder.StartRecording(filePath, device, filterViewModel.filterStrategy);
+                Recorder.StartRecording(filePath, device, filterViewModel.FilterStrategy);
             }
             else
             {

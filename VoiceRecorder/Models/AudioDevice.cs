@@ -1,45 +1,47 @@
-﻿using CSCore.CoreAudioAPI;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSCore.CoreAudioAPI;
 
-public class AudioDevice : IDisposable
+namespace VoiceRecorder.Models;
+
+public sealed class AudioDevice : IDisposable
 {
-    private MMDeviceEnumerator mmdeviceEnumerator;
-    private bool disposed = false;
+    private MMDeviceEnumerator _mmdeviceEnumerator;
+    private bool _disposed = false;
 
     public AudioDevice()
     {
-        mmdeviceEnumerator = new MMDeviceEnumerator();
+        _mmdeviceEnumerator = new MMDeviceEnumerator();
     }
 
     public List<string> GetAvailableDevices()
     {
-        return mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+        return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
             .Select(device => device.FriendlyName)
             .ToList();
     }
 
     public MMDevice SelectDevice(string deviceName)
     {
-        return mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+        return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
             .FirstOrDefault(device => device.FriendlyName == deviceName);
     }
 
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
-        if (!disposed)
+        if (!_disposed)
         {
             if (disposing)
             {
-                if (mmdeviceEnumerator != null)
+                if (_mmdeviceEnumerator != null)
                 {
-                    mmdeviceEnumerator.Dispose();
-                    mmdeviceEnumerator = null;
+                    _mmdeviceEnumerator.Dispose();
+                    _mmdeviceEnumerator = null;
                 }
             }
 
-            disposed = true;
+            _disposed = true;
         }
     }
 

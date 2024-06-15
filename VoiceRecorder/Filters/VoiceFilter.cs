@@ -1,22 +1,23 @@
-﻿using System;
-using CSCore;
-using VoiceRecorder.Filters.Interfaces;
+﻿using VoiceRecorder.Filters.Interfaces;
+using VoiceRecorder.Models;
+
+namespace VoiceRecorder.Filters;
 
 public class VoiceFilter
 {
-    private AudioRecorder recorder;
-    private IAudioFilter filterStrategy;
+    private readonly AudioRecorder _recorder;
+    private readonly IAudioFilter _filterStrategy;
 
     public VoiceFilter(AudioRecorder recorder, IAudioFilter filterStrategy)
     {
-        this.recorder = recorder;
-        this.filterStrategy = filterStrategy;
+        this._recorder = recorder;
+        this._filterStrategy = filterStrategy;
     }
 
     public void ApplyFilter()
     {
-        var source = recorder.CaptureSource;
-        var filteredSource = filterStrategy.ApplyFilter(source);
-        recorder.UpdateSource(filteredSource);
+        var source = _recorder.CaptureSource;
+        var filteredSource = _filterStrategy.ApplyFilter(source);
+        _recorder.UpdateSource(filteredSource);
     }
 }
