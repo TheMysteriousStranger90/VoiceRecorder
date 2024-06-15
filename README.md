@@ -8,7 +8,7 @@ VoiceRecorder is an user-friendly application designed to record audio from sele
 
 ## Installation
 
-To install the VoiceRecorder application, download the VoiceRecorderApp.rar. Extract the .rar file, and run the VoiceRecorder.exe file on your machine.
+To install the VoiceRecorder application, download the VoiceRecorder.rar. Extract the .rar file, and run the VoiceRecorder.exe file on your machine.
 
 ## Usage
 
