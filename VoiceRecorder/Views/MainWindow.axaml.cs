@@ -24,11 +24,15 @@ public partial class MainWindow : Window
     private TimeSpan _time;
 
     private readonly TextBlock _buttonTextBlock;
+    
+    public static MainWindow Current { get; private set; }
 
     public MainWindow()
     {
         InitializeComponent();
 
+        Current = this;
+        
         Recorder = new AudioRecorder();
         Device = new AudioDevice();
 
@@ -92,6 +96,7 @@ public partial class MainWindow : Window
 
                 this._buttonTextBlock.Text = $"Recording started.";
                 deviceList.IsEnabled = false;
+                viewModel.IsSecondWindowActive = false;
             }
             else
             {
@@ -120,6 +125,7 @@ public partial class MainWindow : Window
 
             _timer.Stop();
             this._buttonTextBlock.Text = $"Recording saved.";
+            viewModel.IsSecondWindowActive = true;
         }
         catch (Exception ex)
         {
@@ -151,6 +157,28 @@ public partial class MainWindow : Window
         {
             Debug.WriteLine(ex.ToString());
         }
+    }
+    
+    private void NavigateToMainWindow(object sender, RoutedEventArgs e)
+    {
+        viewModel.IsMainWindowActive = false;
+        MainContent.Content = new MainWindow();
+    }
+
+    private void NavigateToSecondWindow(object sender, RoutedEventArgs e)
+    {
+        if (viewModel.IsSecondWindowActive == true)
+        {
+            var secondWindow = new SecondWindow();
+            secondWindow.Show();
+        }
+    }
+    
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        
+        Current = null;
     }
 
     private void InitializeComponent()

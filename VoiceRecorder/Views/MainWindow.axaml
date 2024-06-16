@@ -9,7 +9,7 @@
         Icon="/Assets/icon.ico"
         Opacity="0.9"
         Title="Voice Recorder">
-
+    
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
              to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
@@ -20,6 +20,13 @@
     </Window.Styles>
 
     <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Left" Width="200">
+            <Button Content="Go To Recording" Click="NavigateToMainWindow" IsEnabled="{Binding IsMainWindowActive}" Margin="10,30,10,10"/>
+            <Button Content="Go To File Explorer" Click="NavigateToSecondWindow" IsEnabled="{Binding IsSecondWindowActive}" Margin="10"/>
+        </StackPanel>
+
+        <ContentControl x:Name="MainContent" />
+        
         <Border DockPanel.Dock="Bottom" CornerRadius="10" Background="#80F" Margin="20,55,20,5">
             <StackPanel Height="35">
                 <TextBlock x:Name="StopButtonTextBlock" Foreground="#FFFFFFFF" FontSize="14" TextAlignment="Center"

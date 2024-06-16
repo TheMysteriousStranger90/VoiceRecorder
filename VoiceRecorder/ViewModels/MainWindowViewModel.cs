@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using ReactiveUI;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Models;
+using VoiceRecorder.Utils;
 
 namespace VoiceRecorder.ViewModels
 {
@@ -15,6 +14,9 @@ namespace VoiceRecorder.ViewModels
 
         public List<VoiceFilterViewModel> AvailableFilters { get; set; }
         public VoiceFilterViewModel SelectedFilterViewModel { get; set; }
+
+        public bool IsMainWindowActive { get; set; } = false;
+        public bool IsSecondWindowActive { get; set; } = true;
 
         private List<string> _availableDevices;
 
@@ -37,7 +39,11 @@ namespace VoiceRecorder.ViewModels
         public bool IsRecording
         {
             get { return _isRecording; }
-            set { this.RaiseAndSetIfChanged(ref _isRecording, value); }
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _isRecording, value);
+                IsSecondWindowActive = !value;
+            }
         }
 
         public MainWindowViewModel()
@@ -60,16 +66,7 @@ namespace VoiceRecorder.ViewModels
 
         public void StartRecording(string deviceName, VoiceFilterViewModel filterViewModel)
         {
-            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "VoiceRecorder");
-            Directory.CreateDirectory(defaultPath);
-
-            string deviceFolderPath = Path.Combine(defaultPath, deviceName);
-            Directory.CreateDirectory(deviceFolderPath);
-
-            string fileName = $"output_{DateTime.Now:yyyyMMdd_HHmmss}.wav";
-            string filePath = Path.Combine(deviceFolderPath, fileName);
-
+            string filePath = AudioFilePathHelper.GenerateAudioFilePath(deviceName);
             var device = Device.SelectDevice(deviceName);
 
             if (filterViewModel != null && filterViewModel.FilterStrategy != null)
