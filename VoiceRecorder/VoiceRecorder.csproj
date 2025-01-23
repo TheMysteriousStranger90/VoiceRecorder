@@ -26,6 +26,7 @@
         <PackageReference Include="CSCore" Version="1.2.1.2" />
         <PackageReference Include="CSCore.Ffmpeg" Version="1.2.0-beta1" />
         <PackageReference Include="LiveChartsCore.SkiaSharpView.Avalonia" Version="2.0.0-rc2" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     </ItemGroup>
 
     <ItemGroup>

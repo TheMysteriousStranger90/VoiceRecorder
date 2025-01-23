@@ -5,6 +5,7 @@ using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
+using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Models;
@@ -22,19 +23,11 @@ public sealed class AudioRecorder : IDisposable
     {
         try
         {
-            if (device == null)
-            {
-                throw new ArgumentNullException(nameof(device), "Audio device not found");
-            }
-
             _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
             _capture.Device = device;
             _capture.Initialize();
 
-            _soundInSource = new SoundInSource(_capture) 
-            { 
-                FillWithZeros = false 
-            };
+            _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
 
             IWaveSource filteredSource;
             if (filter != null)
@@ -51,29 +44,25 @@ public sealed class AudioRecorder : IDisposable
             byte[] buffer = new byte[filteredSource.WaveFormat.BytesPerSecond / 2];
             _capture.DataAvailable += (s, e) =>
             {
-                try
+                int read;
+                while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    int read;
-                    while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        _writer.Write(buffer, 0, read);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Error in DataAvailable: {ex.Message}");
+                    _writer.Write(buffer, 0, read);
                 }
             };
 
             _capture.Start();
         }
+        catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005)) // Access Denied
+        {
+            throw new UnauthorizedAccessException("Microphone access is denied. Please check your privacy settings.", ex);
+        }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Error initializing audio capture: {ex.Message}");
-            throw;
+            throw new AudioRecorderException("Failed to start recording", ex);
         }
     }
-
+    
     public void StopRecording()
     {
         try
