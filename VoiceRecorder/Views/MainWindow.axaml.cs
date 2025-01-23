@@ -80,27 +80,12 @@ public partial class MainWindow : Window
             if (deviceList != null && deviceList.SelectedItem != null)
             {
                 string selectedDevice = deviceList.SelectedItem.ToString();
-
                 FilterViewModel = viewModel.SelectedFilterViewModel;
-
                 viewModel.StartRecording(selectedDevice, FilterViewModel);
-
-                _time = TimeSpan.Zero;
-                _timer.Start();
-                
-                var progressBar = this.FindControl<ProgressBar>("RecordingProgressBar");
-                if (progressBar != null)
-                {
-                    progressBar.Value = progressBar.Minimum;
-                }
-
+            
                 this._buttonTextBlock.Text = $"Recording started.";
                 deviceList.IsEnabled = false;
                 viewModel.IsSecondWindowActive = false;
-            }
-            else
-            {
-                Console.WriteLine("An error occurred");
             }
         }
         catch (Exception ex)

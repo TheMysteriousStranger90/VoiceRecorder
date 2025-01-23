@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
@@ -21,11 +22,19 @@ public sealed class AudioRecorder : IDisposable
     {
         try
         {
-            _capture = new WasapiCapture();
+            if (device == null)
+            {
+                throw new ArgumentNullException(nameof(device), "Audio device not found");
+            }
+
+            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
             _capture.Device = device;
             _capture.Initialize();
 
-            _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
+            _soundInSource = new SoundInSource(_capture) 
+            { 
+                FillWithZeros = false 
+            };
 
             IWaveSource filteredSource;
             if (filter != null)
@@ -42,10 +51,17 @@ public sealed class AudioRecorder : IDisposable
             byte[] buffer = new byte[filteredSource.WaveFormat.BytesPerSecond / 2];
             _capture.DataAvailable += (s, e) =>
             {
-                int read;
-                while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
+                try
                 {
-                    _writer.Write(buffer, 0, read);
+                    int read;
+                    while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        _writer.Write(buffer, 0, read);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error in DataAvailable: {ex.Message}");
                 }
             };
 
@@ -53,7 +69,8 @@ public sealed class AudioRecorder : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred: {ex.Message}");
+            Debug.WriteLine($"Error initializing audio capture: {ex.Message}");
+            throw;
         }
     }
 
