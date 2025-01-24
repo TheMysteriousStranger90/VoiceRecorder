@@ -13,6 +13,20 @@ public class AudioPlayer : IDisposable
     private ISoundOut _soundOut;
     private bool _disposed;
     private bool _isPlaying;
+    private float _volume = 1.0f;
+
+    public float Volume
+    {
+        get => _volume;
+        set
+        {
+            _volume = Math.Clamp(value, 0f, 1f);
+            if (_soundOut != null)
+            {
+                _soundOut.Volume = _volume;
+            }
+        }
+    }
 
     public bool IsPlaying => _isPlaying;
     public event EventHandler<PlaybackStatusEventArgs> PlaybackStatusChanged;

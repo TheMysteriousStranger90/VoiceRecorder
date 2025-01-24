@@ -89,6 +89,20 @@
                              Width="24"
                              Height="24"/>
                 </Button>
+                <StackPanel Grid.Row="1" 
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,10,0,0">
+                    <PathIcon Data="{StaticResource VolumeIcon}"
+                              Width="16" 
+                              Height="16"
+                              Margin="0,0,10,0"/>
+                    <Slider Value="{Binding Volume}"
+                            Width="100"
+                            Minimum="0"
+                            Maximum="1"
+                            ToolTip.Tip="Volume"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

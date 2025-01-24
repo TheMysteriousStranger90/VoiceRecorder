@@ -32,6 +32,16 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         get => _playbackStatus;
         private set => this.RaiseAndSetIfChanged(ref _playbackStatus, value);
     }
+    private float _volume = 1.0f;
+    public float Volume
+    {
+        get => _volume;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _volume, value);
+            _player.Volume = value;
+        }
+    }
     public ObservableCollection<string> Folders { get; } = new ObservableCollection<string>();
     public ObservableCollection<string> Files { get; } = new ObservableCollection<string>();
     public ReactiveCommand<string, Unit> OpenFileCommand { get; }
