@@ -48,6 +48,12 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
     public ICommand PlayFileCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand StopCommand { get; }
+    public event EventHandler<string> StatusChanged;
+
+    private void UpdateStatus(string message)
+    {
+        StatusChanged?.Invoke(this, message);
+    }
 
     public FileExplorerViewModel()
     {
@@ -114,8 +120,18 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         IsPlaying = e.IsPlaying;
         CurrentPlayingFile = e.CurrentFile;
         
+        if (e.IsPlaying)
+        {
+            UpdateStatus($"Playing: {e.CurrentFile}");
+        }
+        else
+        {
+            UpdateStatus("Playback stopped");
+        }
+
         if (!string.IsNullOrEmpty(e.ErrorMessage))
         {
+            UpdateStatus($"Error: {e.ErrorMessage}");
             Debug.WriteLine($"Playback error: {e.ErrorMessage}");
         }
     }
