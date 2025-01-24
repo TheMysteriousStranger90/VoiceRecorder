@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Diagnostics;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
+using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Models;
@@ -21,7 +23,7 @@ public sealed class AudioRecorder : IDisposable
     {
         try
         {
-            _capture = new WasapiCapture();
+            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
             _capture.Device = device;
             _capture.Initialize();
 
@@ -51,12 +53,16 @@ public sealed class AudioRecorder : IDisposable
 
             _capture.Start();
         }
+        catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005)) // Access Denied
+        {
+            throw new UnauthorizedAccessException("Microphone access is denied. Please check your privacy settings.", ex);
+        }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred: {ex.Message}");
+            throw new AudioRecorderException("Failed to start recording", ex);
         }
     }
-
+    
     public void StopRecording()
     {
         try

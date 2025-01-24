@@ -3,69 +3,58 @@
         xmlns:vm="using:VoiceRecorder.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="720"
+        Width="1280" Height="720"
+        MinWidth="800" MinHeight="600"
         x:Class="VoiceRecorder.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
         Opacity="0.9"
         Title="Voice Recorder">
     
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel />
-    </Design.DataContext>
     <Window.Styles>
         <StyleInclude Source="/Styles/Styles.axaml" />
     </Window.Styles>
 
-    <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Left" Width="200">
-            <Button Content="Go To Recording" Click="NavigateToMainWindow" IsEnabled="{Binding IsMainWindowActive}" Margin="10,30,10,10"/>
-            <Button Content="Go To File Explorer" Click="NavigateToSecondWindow" IsEnabled="{Binding IsSecondWindowActive}" Margin="10"/>
-        </StackPanel>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="60" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <ContentControl x:Name="MainContent" />
-        
-        <Border DockPanel.Dock="Bottom" CornerRadius="10" Background="#80F" Margin="20,55,20,5">
-            <StackPanel Height="35">
-                <TextBlock x:Name="StopButtonTextBlock" Foreground="#FFFFFFFF" FontSize="14" TextAlignment="Center"
-                           Padding="10" />
+        <!-- Navigation Panel -->
+        <Border Classes="panel" Grid.Column="0" Margin="8,16,4,16">
+            <StackPanel Spacing="8">
+                <Button Classes="navButton"
+                        Command="{Binding ShowRecordingViewCommand}">
+                    <PathIcon Data="{StaticResource RecordIcon}"
+                             Width="20"
+                             Height="20" />
+                </Button>
+                <Button Classes="navButton"
+                        Command="{Binding ShowFileExplorerCommand}">
+                    <PathIcon Data="{StaticResource FolderIcon}"
+                             Width="20"
+                             Height="20" />
+                </Button>
             </StackPanel>
         </Border>
 
-        <StackPanel Margin="10">
-            <ProgressBar x:Name="RecordingProgressBar" Minimum="0" Maximum="100" Margin="0,10,0,0" />
-            <Label x:Name="TimerLabel" Content="00:00:00" Margin="0,10,0,0" />
+        <!-- Status Bar -->
+        <Border Grid.Column="1" DockPanel.Dock="Bottom" 
+                CornerRadius="10" Background="#80F" 
+                Margin="20,0,20,16" Height="35"
+                VerticalAlignment="Bottom">
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="White" 
+                       FontSize="14" 
+                       TextAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Border>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button Click="StartButton_Click" Margin="0,10,10,0">
-                    <Image Source="{SvgImage /Assets/play.svg}" Width="25" Height="25" />
-                </Button>
-
-                <Button Click="StopButton_Click" IsEnabled="{Binding IsRecording}" Margin="10,10,0,0">
-                    <Image Source="{SvgImage /Assets/pause.svg}" Width="25" Height="25" />
-                </Button>
-            </StackPanel>
-
-            <Grid ColumnDefinitions="*, 4, *" Margin="0,10,0,0">
-                <StackPanel Grid.Column="0">
-                    <Label Content="FILTERS" Foreground="White" HorizontalAlignment="Center" />
-                    <ListBox x:Name="FilterList" SelectedIndex="-1" ItemsSource="{Binding AvailableFilters}"
-                             SelectedItem="{Binding SelectedFilterViewModel}" Margin="0,0,0,0" />
-                </StackPanel>
-                <GridSplitter Grid.Column="1" Background="Black" ResizeDirection="Columns" />
-                <StackPanel Grid.Column="2">
-                    <Label Content="DEVICES" Foreground="White" HorizontalAlignment="Center" />
-                    <ListBox x:Name="DeviceList" SelectedIndex="0" ItemsSource="{Binding AvailableDevices}"
-                             SelectedItem="{Binding SelectedDevice}" Margin="0,0,0,0" />
-                </StackPanel>
-            </Grid>
-
-            <Button Click="OpenFolderButton_Click" HorizontalAlignment="Center" Margin="0,30,0,0">
-                <Image Source="{SvgImage /Assets/folder-plus.svg}" Width="25" Height="25" />
-            </Button>
-        </StackPanel>
-
-    </DockPanel>
+        <!-- Content Area -->
+        <ContentControl Grid.Column="1"
+                       Content="{Binding CurrentView}"
+                       Margin="8,16,16,60" />
+    </Grid>
 </Window>

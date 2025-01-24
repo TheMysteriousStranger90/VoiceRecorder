@@ -7,15 +7,16 @@ using ReactiveUI;
 
 namespace VoiceRecorder.ViewModels;
 
-public class SecondWindowViewModel : ViewModelBase
+public class FileExplorerViewModel : ViewModelBase
 {
     public ObservableCollection<string> Folders { get; } = new ObservableCollection<string>();
     public ObservableCollection<string> Files { get; } = new ObservableCollection<string>();
     public ReactiveCommand<string, Unit> OpenFileCommand { get; }
 
-    public SecondWindowViewModel()
+    public FileExplorerViewModel()
     {
         OpenFileCommand = ReactiveCommand.Create<string>(OpenFile);
+        LoadFoldersAndFiles();
     }
 
     public void LoadFoldersAndFiles()
@@ -23,7 +24,7 @@ public class SecondWindowViewModel : ViewModelBase
         string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VoiceRecorder");
         int pathLength = path.Length + 1;
 
-        
+
         if (!Directory.Exists(path))
         {
             Directory.CreateDirectory(path);

@@ -1,49 +1,200 @@
 ﻿<Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Design.PreviewWith>
-        <Border Padding="20">
-            <!-- Add Controls for Previewer Here -->
-        </Border>
-    </Design.PreviewWith>
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:VoiceRecorder.Controls">
+    
+    <!-- Base Colors -->
+    <Style>
+        <Style.Resources>
+            <Color x:Key="PrimaryColor">#80F</Color>
+            <Color x:Key="SecondaryColor">#214</Color>
+            <Color x:Key="AccentColor">#F0F</Color>
+        </Style.Resources>
+    </Style>
+    
+    
+    <Style Selector="controls|AudioVisualizerControl">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border 
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                    <Panel x:Name="PART_ContentPresenter"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Setter Property="Margin" Value="0,10"/>
+        <Setter Property="Height" Value="100"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#214"/>
+                <GradientStop Offset="1" Color="#103"/>
+            </LinearGradientBrush>
+        </Setter>
+    </Style>
 
-    <!-- Add Styles Here -->
+    <!-- Button Styles -->
     <Style Selector="Button">
-        <Setter Property="Foreground" Value="#FFFFFFFF" />
-        <Setter Property="BorderThickness" Value="3" />
-        <Setter Property="Background" Value="#80F" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#80F"/>
+                    <GradientStop Offset="1" Color="#214"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
         <Setter Property="BorderBrush" Value="#214" />
         <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="15,8"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0.2"/>
+            </Transitions>
+        </Setter>
     </Style>
-    
-    <Style Selector="ProgressBar#RecordingProgressBar">
-        <Setter Property="Height" Value="30"/>
-        <Setter Property="Width" Value="800"/>
-        <Setter Property="Foreground" Value="#80F"/>
-        <Setter Property="Background" Value="#214"/>
-        <Setter Property="BorderBrush" Value="Black"/>
+
+    <Style Selector="Button:pointerover">
+        <Setter Property="RenderTransform" Value="scale(1.05)"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#A0F"/>
+                    <GradientStop Offset="1" Color="#326"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.95)"/>
+    </Style>
+
+    <!-- ListBox Styles -->
+    <Style Selector="ListBox">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Offset="0" Color="#214"/>
+                    <GradientStop Offset="1" Color="#103"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="BorderBrush" Value="#80F"/>
         <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="Padding" Value="10"/>
         <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
     </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="ListBoxItem:pointerover">
+        <Setter Property="Background" Value="#80F"/>
+        <Setter Property="RenderTransform" Value="scale(1.02)"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#80F"/>
+                    <GradientStop Offset="1" Color="#A0F"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Label Styles -->
+    <Style Selector="Label">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- TextBlock Styles -->
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <!-- Border Styles -->
+    <Style Selector="Border">
+        <Setter Property="BoxShadow" Value="0 2 10 0 #40000000"/>
+        <Setter Property="Transitions">
+            <Transitions>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <!-- AudioVisualizer Control Style -->
+    <Style Selector="controls|AudioVisualizerControl">
+        <Setter Property="Margin" Value="0,10"/>
+        <Setter Property="Height" Value="100"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Offset="0" Color="#214"/>
+                    <GradientStop Offset="1" Color="#103"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Grid Splitter Style -->
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="#80F"/>
+        <Setter Property="Width" Value="4"/>
+    </Style>
+
+    
     
     <Style Selector="Label#TimerLabel">
-        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#80F"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="FontStyle" Value="Italic"/>
-        <Setter Property="Padding" Value="10"/>
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#214"/>
+                <GradientStop Offset="1" Color="#103"/>
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="Padding" Value="15,5"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="BorderBrush" Value="#80F"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="BorderBrush" Value="Black"/>
-    </Style>
-    
-    <Style Selector="ListBox">
-        <Setter Property="Background" Value="#214"/>
-        <Setter Property="Foreground" Value="#80F"/>
-        <Setter Property="BorderBrush" Value="Black"/>
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="Padding" Value="10"/>
-        <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="FontFamily" Value="Calisto"/>
+        <Setter Property="Margin" Value="0,5,0,0"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
     </Style>
 </Styles>

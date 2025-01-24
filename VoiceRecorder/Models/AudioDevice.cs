@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using CSCore.CoreAudioAPI;
 
@@ -12,20 +13,44 @@ public sealed class AudioDevice : IDisposable
 
     public AudioDevice()
     {
-        _mmdeviceEnumerator = new MMDeviceEnumerator();
+        try
+        {
+            _mmdeviceEnumerator = new MMDeviceEnumerator();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error initializing MMDeviceEnumerator: {ex.Message}");
+            throw;
+        }
     }
 
     public List<string> GetAvailableDevices()
     {
-        return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-            .Select(device => device.FriendlyName)
-            .ToList();
+        try
+        {
+            return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                .Select(device => device.FriendlyName)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error enumerating devices: {ex.Message}");
+            return new List<string>();
+        }
     }
 
     public MMDevice SelectDevice(string deviceName)
     {
-        return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-            .FirstOrDefault(device => device.FriendlyName == deviceName);
+        try
+        {
+            return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                .FirstOrDefault(device => device.FriendlyName == deviceName);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error selecting device: {ex.Message}");
+            return null;
+        }
     }
 
     private void Dispose(bool disposing)
