@@ -14,6 +14,9 @@
     </Application.Styles>
 
     <Application.Resources>
+        <StreamGeometry x:Key="PlayIcon">M8,5.14V19.14L19,12.14L8,5.14Z</StreamGeometry>
+        <StreamGeometry x:Key="PauseIcon">M14,19H18V5H14M6,19H10V5H6V19Z</StreamGeometry>
+        <StreamGeometry x:Key="StopIcon">M18,18H6V6H18V18Z</StreamGeometry>
         <StreamGeometry x:Key="RecordIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,17C13.5,17 16.5,16.5 16.5,15V14.5C16.5,13.5 13.5,13 12,13C10.5,13 7.5,13.5 7.5,14.5V15C7.5,16.5 10.5,17 12,17Z</StreamGeometry>
         <StreamGeometry x:Key="FolderIcon">M20,18H4V8H20M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z</StreamGeometry>
     </Application.Resources>
