@@ -30,3 +30,11 @@ Bohdan Harabadzhyu
 ## SourceForge
 
 [![Download VoiceRecorder](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/voice-recorder-stranger90/files/latest/download)
+
+## YouTube Review
+<details>
+<summary>📺 Watch Video Review</summary>
+
+[![YouTube](http://i.ytimg.com/vi/yOA-aRZ6elw/hqdefault.jpg)](https://www.youtube.com/watch?v=yOA-aRZ6elw)
+</details>
+
