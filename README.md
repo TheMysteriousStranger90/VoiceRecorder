@@ -1,14 +1,11 @@
 # VoiceRecorder
 
-![Screenshot of the application](Screenshots/Screen1.png)
+![Screens1](Screenshots/Screen1.png)
+![Screens2](Screenshots/Screen2.png)
 
 ## Description
 
 VoiceRecorder is an user-friendly application designed to record audio from selected devices. It's perfect for quick recordings and  audio testing.
-
-## Installation
-
-To install the VoiceRecorder application, download the VoiceRecorder.rar. Extract the .rar file, and run the VoiceRecorder.exe file on your machine.
 
 ## Usage
 
