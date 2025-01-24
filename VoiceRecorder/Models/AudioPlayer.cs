@@ -39,6 +39,7 @@ public class AudioPlayer : IDisposable
         {
             _waveSource = CodecFactory.Instance.GetCodec(filePath);
             _soundOut = new WasapiOut();
+            _soundOut.Stopped += OnPlaybackStopped;
             _soundOut.Initialize(_waveSource);
             _soundOut.Play();
             _isPlaying = true;
@@ -51,11 +52,17 @@ public class AudioPlayer : IDisposable
             PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(false, null, ex.Message));
         }
     }
+    
+    private void OnPlaybackStopped(object sender, EventArgs e)
+    {
+        Stop();
+    }
 
     public void Stop()
     {
         if (_soundOut != null)
         {
+            _soundOut.Stopped -= OnPlaybackStopped;
             _soundOut.Stop();
             _soundOut.Dispose();
             _soundOut = null;

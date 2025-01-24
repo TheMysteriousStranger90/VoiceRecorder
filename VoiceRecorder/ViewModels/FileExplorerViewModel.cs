@@ -116,7 +116,6 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         
         if (!string.IsNullOrEmpty(e.ErrorMessage))
         {
-            // Handle error
             Debug.WriteLine($"Playback error: {e.ErrorMessage}");
         }
     }
