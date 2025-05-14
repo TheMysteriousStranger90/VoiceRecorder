@@ -10,8 +10,16 @@
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-
         <ApplicationIcon>./Assets/icon.ico</ApplicationIcon>
+        <AssemblyVersion>1.2.0.0</AssemblyVersion>
+        <FileVersion>1.2.0.0</FileVersion>
+        <InformationalVersion>1.2.0.0</InformationalVersion>
+        <Authors>Bohdan Harabadzhyu</Authors>
+        <Product>Voice Recorder</Product>
+        <Description>A voice recording application.</Description>
+        <Copyright>Copyright © Bohdan Harabadzhyu</Copyright>
+        <RepositoryUrl>https://github.com/TheMysteriousStranger90/VoiceRecorder</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
     </PropertyGroup>
     
     <ItemGroup>
