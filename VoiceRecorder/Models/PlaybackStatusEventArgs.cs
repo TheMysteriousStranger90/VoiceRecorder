@@ -4,13 +4,20 @@ namespace VoiceRecorder.Models;
 
 public class PlaybackStatusEventArgs : EventArgs
 {
-    public bool IsPlaying { get; }
+    public PlaybackState State { get; }
     public string CurrentFile { get; }
     public string ErrorMessage { get; }
-
-    public PlaybackStatusEventArgs(bool isPlaying, string currentFile, string errorMessage = null)
+    
+    public PlaybackStatusEventArgs(PlaybackState state, string currentFile)
     {
-        IsPlaying = isPlaying;
+        State = state;
+        CurrentFile = currentFile;
+        ErrorMessage = null;
+    }
+    
+    public PlaybackStatusEventArgs(string errorMessage, string currentFile = null)
+    {
+        State = PlaybackState.Stopped;
         CurrentFile = currentFile;
         ErrorMessage = errorMessage;
     }

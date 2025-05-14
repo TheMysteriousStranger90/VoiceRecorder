@@ -8,6 +8,13 @@ public class EchoFilter : IAudioFilter
 {
     public IWaveSource ApplyFilter(IWaveSource source)
     {
-        return new DmoEchoEffect(source);
+        var echoEffect = new DmoEchoEffect(source);
+
+        echoEffect.WetDryMix = 60f;
+        echoEffect.Feedback = 60f;
+        echoEffect.LeftDelay = 500f;
+        echoEffect.RightDelay = 500f;
+
+        return echoEffect;
     }
 }

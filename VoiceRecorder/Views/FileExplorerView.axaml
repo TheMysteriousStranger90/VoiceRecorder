@@ -3,55 +3,88 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:VoiceRecorder.ViewModels"
+             xmlns:models="using:VoiceRecorder.Models"
              xmlns:controls="clr-namespace:VoiceRecorder.Controls"
              xmlns:conv="using:VoiceRecorder.Converters"
-             xmlns:converters="clr-namespace:VoiceRecorder.Converters"
              x:Class="VoiceRecorder.Views.FileExplorerView"
              x:DataType="vm:FileExplorerViewModel">
 
     <Design.DataContext>
         <vm:FileExplorerViewModel />
     </Design.DataContext>
-    
+
     <UserControl.Resources>
-        <converters:PlayPauseIconConverter x:Key="PlayPauseIconConverter"/>
-        <converters:PlayingFileConverter x:Key="PlayingFileConverter"/>
+        <conv:PlayPauseIconConverter x:Key="PlayPauseIconConverter"/>
+        <conv:PlayingFileConverter x:Key="PlayingFileConverter"/>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
         <!-- Header -->
-        <TextBlock Grid.Row="0" 
+        <TextBlock Grid.Row="0"
                    Text="Recorded Files"
                    FontSize="20"
                    Foreground="White"
                    HorizontalAlignment="Center"
-                   Margin="0,10,0,20"/>
+                   Margin="0,10,0,10"/>
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
+            <Button Command="{Binding RefreshFilesCommand}" ToolTip.Tip="Refresh File List" Margin="0,0,5,0">
+                <PathIcon Data="{StaticResource RefreshIconGeometry}" Width="16" Height="16"/>
+            </Button>
+        </StackPanel>
 
         <!-- File List -->
-        <ScrollViewer Grid.Row="1" 
-                     VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <ListBox ItemsSource="{Binding Files}"
                      x:Name="FilesList"
                      Background="Transparent"
                      Margin="10">
                 <ListBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type x:String}">
-                        <Grid ColumnDefinitions="Auto,*">
+                    <DataTemplate DataType="{x:Type models:AudioFileItem}">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,5">
+                            <!-- Play Button -->
                             <Button Grid.Column="0"
                                     Command="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).PlayFileCommand}"
                                     CommandParameter="{Binding}"
+                                    Background="Transparent" BorderThickness="0"
                                     Margin="0,0,10,0">
-                                <PathIcon Data="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).IsPlaying, 
-                          Converter={StaticResource PlayPauseIconConverter}}"
-                                          Width="16"
-                                          Height="16"/>
+                                <PathIcon Width="16" Height="16">
+                                    <PathIcon.Data>
+                                        <MultiBinding Converter="{StaticResource PlayPauseIconConverter}">
+                                            <Binding Path="$parent[UserControl].((vm:FileExplorerViewModel)DataContext).IsActuallyPlaying"/>
+                                            <Binding Path="$parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile"/>
+                                            <Binding Path="."/>
+                                        </MultiBinding>
+                                    </PathIcon.Data>
+                                </PathIcon>
                             </Button>
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding}"
-                                       VerticalAlignment="Center"
-                                       Foreground="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile, 
-                                Converter={StaticResource PlayingFileConverter}, 
-                                ConverterParameter={Binding}}"/>
+
+                            <!-- File Info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Medium"
+                                           Foreground="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile, 
+                                                    Converter={StaticResource PlayingFileConverter}, 
+                                                    ConverterParameter={Binding}}"/>
+                                <TextBlock FontSize="10" Foreground="WhiteSmoke">
+                                    <Run Text="{Binding FormattedDuration}"/> | <Run Text="{Binding FormattedSize}"/>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding DateCreated, StringFormat='{}{0:dd.MM.yy HH:mm}'}"
+                                       VerticalAlignment="Center" Margin="10,0" FontSize="11" Foreground="LightGray"/>
+
+                            <!-- Delete Button -->
+                            <Button Grid.Column="4"
+                                    Command="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).DeleteFileCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="Delete File"
+                                    Background="Transparent" BorderThickness="0"
+                                    Margin="5,0">
+                                <PathIcon Data="{StaticResource DeleteIconGeometry}" Width="16" Height="16"/>
+                            </Button>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -59,48 +92,43 @@
         </ScrollViewer>
 
         <!-- Player Controls -->
-        <Border Grid.Row="2" 
+        <Border Grid.Row="3"
                 Background="#303040"
                 CornerRadius="8"
                 Margin="10"
                 Padding="15"
                 IsVisible="{Binding IsPlaying}">
             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
-                <Button Grid.Column="0"
-                        Command="{Binding PlayPauseCommand}">
-                    <PathIcon Data="{Binding IsPlaying, 
-                                    Converter={StaticResource PlayPauseIconConverter}}"
-                             Width="24"
-                             Height="24"/>
-                </Button>
-                
-                <StackPanel Grid.Column="1" Margin="15,0">
+
+                <StackPanel Grid.Column="1" Grid.Row="0" Margin="15,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding CurrentPlayingFile}"
-                             Foreground="White"
-                             FontSize="14"/>
+                               Foreground="White"
+                               FontSize="14"
+                               TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding PlaybackStatus}"
-                             Foreground="Gray"
-                             FontSize="12"/>
+                               Foreground="Gray"
+                               FontSize="12"/>
                 </StackPanel>
-                
-                <Button Grid.Column="2"
+
+                <Button Grid.Column="2" Grid.Row="0"
                         Command="{Binding StopCommand}">
                     <PathIcon Data="{StaticResource StopIcon}"
-                             Width="24"
-                             Height="24"/>
+                              Width="24"
+                              Height="24"/>
                 </Button>
-                <StackPanel Grid.Row="1" 
+                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                             Orientation="Horizontal"
-                            HorizontalAlignment="Right"
+                            HorizontalAlignment="Stretch"
                             Margin="0,10,0,0">
                     <PathIcon Data="{StaticResource VolumeIcon}"
-                              Width="16" 
+                              Width="16"
                               Height="16"
-                              Margin="0,0,10,0"/>
+                              Margin="0,0,10,0" VerticalAlignment="Center"/>
                     <Slider Value="{Binding Volume}"
-                            Width="100"
+                            MinWidth="100"
                             Minimum="0"
                             Maximum="1"
+                            VerticalAlignment="Center"
                             ToolTip.Tip="Volume"/>
                 </StackPanel>
             </Grid>

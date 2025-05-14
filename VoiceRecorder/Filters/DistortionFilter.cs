@@ -8,6 +8,12 @@ public class DistortionFilter : IAudioFilter
 {
     public IWaveSource ApplyFilter(IWaveSource source)
     {
-        return new DmoDistortionEffect(source);
+        var distortionEffect = new DmoDistortionEffect(source);
+
+        distortionEffect.Gain = -10;
+        distortionEffect.PostEQCenterFrequency = 200f;
+        distortionEffect.PostEQBandwidth = 1500f;
+
+        return distortionEffect;
     }
 }

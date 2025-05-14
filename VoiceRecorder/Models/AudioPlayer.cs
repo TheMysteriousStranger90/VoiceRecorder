@@ -12,8 +12,9 @@ public class AudioPlayer : IDisposable
     private IWaveSource _waveSource;
     private ISoundOut _soundOut;
     private bool _disposed;
-    private bool _isPlaying;
     private float _volume = 1.0f;
+    private PlaybackState _playbackState = PlaybackState.Stopped;
+    private string _currentFilePath;
 
     public float Volume
     {
@@ -27,38 +28,84 @@ public class AudioPlayer : IDisposable
             }
         }
     }
+    
+    public PlaybackState CurrentPlaybackState => _playbackState;
 
-    public bool IsPlaying => _isPlaying;
     public event EventHandler<PlaybackStatusEventArgs> PlaybackStatusChanged;
 
     public void PlayFile(string filePath)
     {
+        if (string.IsNullOrEmpty(filePath)) return;
+
         Stop();
-        
+
         try
         {
-            _waveSource = CodecFactory.Instance.GetCodec(filePath);
+            _currentFilePath = filePath;
+            _waveSource = CodecFactory.Instance.GetCodec(_currentFilePath);
             _soundOut = new WasapiOut();
             _soundOut.Stopped += OnPlaybackStopped;
             _soundOut.Initialize(_waveSource);
+            _soundOut.Volume = _volume;
             _soundOut.Play();
-            _isPlaying = true;
+            _playbackState = PlaybackState.Playing;
             
-            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(true, Path.GetFileName(filePath)));
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(PlaybackState.Playing, Path.GetFileName(_currentFilePath)));
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Playback error: {ex.Message}");
-            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(false, null, ex.Message));
+            _currentFilePath = null;
+            _playbackState = PlaybackState.Stopped;
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(ex.Message, Path.GetFileName(filePath)));
+        }
+    }
+
+    public void PausePlayback()
+    {
+        if (_soundOut != null && _playbackState == PlaybackState.Playing)
+        {
+            try
+            {
+                _soundOut.Pause();
+                _playbackState = PlaybackState.Paused;
+                PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(PlaybackState.Paused, Path.GetFileName(_currentFilePath)));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error pausing playback: {ex.Message}");
+            }
+        }
+    }
+
+    public void ResumePlayback()
+    {
+        if (_soundOut != null && _playbackState == PlaybackState.Paused)
+        {
+            try
+            {
+                _soundOut.Play();
+                _playbackState = PlaybackState.Playing;
+                PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(PlaybackState.Playing, Path.GetFileName(_currentFilePath)));
+            }
+            catch (Exception ex)
+            {
+                 Debug.WriteLine($"Error resuming playback: {ex.Message}");
+            }
         }
     }
     
     private void OnPlaybackStopped(object sender, EventArgs e)
     {
-        Stop();
+        if (_playbackState != PlaybackState.Stopped)
+        {
+            string lastFile = _currentFilePath != null ? Path.GetFileName(_currentFilePath) : null;
+            
+            StopInternal(true, lastFile);
+        }
     }
-
-    public void Stop()
+    
+    private void StopInternal(bool fromPlaybackEnd, string previousFileOverride = null)
     {
         if (_soundOut != null)
         {
@@ -74,8 +121,27 @@ public class AudioPlayer : IDisposable
             _waveSource = null;
         }
 
-        _isPlaying = false;
-        PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(false, null));
+        string fileForEvent = previousFileOverride ?? (_currentFilePath != null ? Path.GetFileName(_currentFilePath) : null);
+        _currentFilePath = null;
+
+        if (_playbackState != PlaybackState.Stopped)
+        {
+            _playbackState = PlaybackState.Stopped;
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(PlaybackState.Stopped, fileForEvent));
+        }
+        else if (fileForEvent != null && _soundOut == null && _waveSource == null)
+        {
+        }
+    }
+
+
+    public void Stop()
+    {
+        if (_playbackState == PlaybackState.Stopped && _soundOut == null && _waveSource == null)
+        {
+            return;
+        }
+        StopInternal(false);
     }
 
     public void Dispose()

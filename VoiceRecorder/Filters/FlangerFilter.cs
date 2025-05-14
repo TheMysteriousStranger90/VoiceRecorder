@@ -1,5 +1,4 @@
 ﻿using CSCore;
-using CSCore.DMO.Effects;
 using CSCore.Streams.Effects;
 using VoiceRecorder.Filters.Interfaces;
 
@@ -9,7 +8,15 @@ public class FlangerFilter : IAudioFilter
 {
     public IWaveSource ApplyFilter(IWaveSource source)
     {
-        return new DmoFlangerEffect(source);
+        var flangerEffect = new DmoFlangerEffect(source);
+
+        flangerEffect.WetDryMix = 50f;
+        flangerEffect.Depth = 80f;
+        flangerEffect.Feedback = 50f;
+        flangerEffect.Frequency = 0.25f;
+        flangerEffect.Delay = 2f;
+        flangerEffect.Waveform = FlangerWaveform.Sin;
+
+        return flangerEffect;
     }
 }
-
