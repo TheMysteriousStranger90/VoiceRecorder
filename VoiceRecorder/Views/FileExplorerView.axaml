@@ -67,6 +67,7 @@
                                            Foreground="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile, 
                                                     Converter={StaticResource PlayingFileConverter}, 
                                                     ConverterParameter={Binding}}"/>
+                                <TextBlock FontSize="10" Foreground="LightGray" Text="{Binding RelativePath}"/>
                                 <TextBlock FontSize="10" Foreground="WhiteSmoke">
                                     <Run Text="{Binding FormattedDuration}"/> | <Run Text="{Binding FormattedSize}"/>
                                 </TextBlock>
