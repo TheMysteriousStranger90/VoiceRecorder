@@ -46,7 +46,7 @@ Choose from multiple professional-grade audio filters:
 ## Usage
 
 1. Select the device you want to record from the list.
-2. Choose from three available filters to enhance your audio OR choose Without Filters field if you don't want to use any filters.
+2. Choose from available filters to enhance your audio OR choose Without Filters field if you don't want to use any filters.
 3. Click the "Start Recording" button to begin recording.
 4. Click the "Stop Recording" button to stop recording. The recording will be saved automatically.
 5. The status of the recording is displayed in the application.
