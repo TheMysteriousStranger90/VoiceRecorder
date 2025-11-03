@@ -53,7 +53,8 @@ public sealed class AudioRecorder : IDisposable
         }
         catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
         {
-            throw new UnauthorizedAccessException("Microphone access is denied. Please check your privacy settings.", ex);
+            throw new UnauthorizedAccessException("Microphone access is denied. Please check your privacy settings.",
+                ex);
         }
         catch (Exception ex)
         {

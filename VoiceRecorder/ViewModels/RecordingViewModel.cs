@@ -184,6 +184,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 _recorder?.Dispose();
                 _device?.Dispose();
             }
+
             _disposed = true;
         }
     }

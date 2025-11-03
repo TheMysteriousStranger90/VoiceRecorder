@@ -35,6 +35,7 @@ internal sealed class VoiceFilterViewModel : INotifyPropertyChanged
 
     public override string ToString()
     {
-        return _filterStrategy?.GetType().Name.Replace("Filter", string.Empty, System.StringComparison.Ordinal) ?? "Without Filters";
+        return _filterStrategy?.GetType().Name.Replace("Filter", string.Empty, System.StringComparison.Ordinal) ??
+               "Without Filters";
     }
 }

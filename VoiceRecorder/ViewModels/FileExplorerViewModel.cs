@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
@@ -130,6 +126,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                         Debug.WriteLine($"IO error loading file info for {file}: {ex.Message}");
                     }
                 }
+
                 return loadedFiles.OrderBy(f => f.DateCreated).ToList();
             }, RxApp.TaskpoolScheduler)
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -244,6 +241,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                     {
                         CurrentPlayingFile = string.Empty;
                     }
+
                     break;
             }
 
@@ -264,7 +262,8 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         string requestedFileName = fileItem.Name;
 
         if (CurrentPlayingFile == requestedFileName &&
-            (_player.CurrentPlaybackState == PlaybackState.Playing || _player.CurrentPlaybackState == PlaybackState.Paused))
+            (_player.CurrentPlaybackState == PlaybackState.Playing ||
+             _player.CurrentPlaybackState == PlaybackState.Paused))
         {
             if (_player.CurrentPlaybackState == PlaybackState.Playing)
             {
@@ -290,6 +289,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                 _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
                 _player?.Dispose();
             }
+
             _disposed = true;
         }
     }

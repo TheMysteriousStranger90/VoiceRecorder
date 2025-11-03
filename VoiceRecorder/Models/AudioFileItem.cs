@@ -58,9 +58,10 @@ internal sealed class AudioFileItem : ReactiveObject
         FullPath = fullPath;
         _name = Path.GetFileName(fullPath);
         _relativePath = fullPath.Substring(basePath.Length +
-                           (basePath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
-                               ? 0
-                               : 1));
+                                           (basePath.EndsWith(Path.DirectorySeparatorChar.ToString(),
+                                               StringComparison.Ordinal)
+                                               ? 0
+                                               : 1));
 
         var fileInfo = new FileInfo(fullPath);
         _dateCreated = fileInfo.CreationTime;
