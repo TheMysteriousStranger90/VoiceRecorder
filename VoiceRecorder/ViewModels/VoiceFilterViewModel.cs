@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Filters.Interfaces;
-using VoiceRecorder.Models;
+using VoiceRecorder.Interfaces;
 
 namespace VoiceRecorder.ViewModels;
 
@@ -12,7 +12,7 @@ internal sealed class VoiceFilterViewModel : INotifyPropertyChanged
 
     public IAudioFilter? FilterStrategy => _filterStrategy;
 
-    public VoiceFilterViewModel(AudioRecorder? recorder, IAudioFilter? filterStrategy)
+    public VoiceFilterViewModel(IAudioRecorder? recorder, IAudioFilter? filterStrategy)
     {
         _filterStrategy = filterStrategy;
         if (recorder != null && filterStrategy != null)
@@ -35,7 +35,7 @@ internal sealed class VoiceFilterViewModel : INotifyPropertyChanged
 
     public override string ToString()
     {
-        return _filterStrategy?.GetType().Name.Replace("Filter", string.Empty, System.StringComparison.Ordinal) ??
+        return _filterStrategy?.GetType().Name.Replace("Filter", string.Empty, StringComparison.Ordinal) ??
                "Without Filters";
     }
 }

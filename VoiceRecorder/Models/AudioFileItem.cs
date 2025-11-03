@@ -55,13 +55,15 @@ internal sealed class AudioFileItem : ReactiveObject
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
 
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("Audio file not found", fullPath);
+        }
+
         FullPath = fullPath;
         _name = Path.GetFileName(fullPath);
-        _relativePath = fullPath.Substring(basePath.Length +
-                                           (basePath.EndsWith(Path.DirectorySeparatorChar.ToString(),
-                                               StringComparison.Ordinal)
-                                               ? 0
-                                               : 1));
+
+        _relativePath = Path.GetRelativePath(basePath, fullPath);
 
         var fileInfo = new FileInfo(fullPath);
         _dateCreated = fileInfo.CreationTime;
@@ -72,8 +74,9 @@ internal sealed class AudioFileItem : ReactiveObject
             using IWaveSource waveSource = CodecFactory.Instance.GetCodec(fullPath);
             _duration = waveSource.GetLength();
         }
-        catch (UnsupportedCodecException)
+        catch (UnsupportedCodecException ex)
         {
+            System.Diagnostics.Debug.WriteLine($"Unsupported codec for {fullPath}: {ex.Message}");
             _duration = TimeSpan.Zero;
         }
     }

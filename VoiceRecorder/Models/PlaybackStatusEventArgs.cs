@@ -1,6 +1,6 @@
 ﻿namespace VoiceRecorder.Models;
 
-internal sealed class PlaybackStatusEventArgs : EventArgs
+public sealed class PlaybackStatusEventArgs : EventArgs
 {
     public PlaybackState State { get; }
     public string FileName { get; }

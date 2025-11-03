@@ -1,19 +1,49 @@
-﻿namespace VoiceRecorder.Utils;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
 
-public static class AudioFilePathHelper
+namespace VoiceRecorder.Utils;
+
+public static partial class AudioFilePathHelper
 {
+    [GeneratedRegex(@"[<>:""/\\|?*]", RegexOptions.Compiled)]
+    private static partial Regex InvalidFileNameCharsRegex();
+
     public static string GenerateAudioFilePath(string deviceName)
     {
-        string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceName);
+
+        string basePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "VoiceRecorder");
-        Directory.CreateDirectory(defaultPath);
 
-        string deviceFolderPath = Path.Combine(defaultPath, deviceName);
-        Directory.CreateDirectory(deviceFolderPath);
+        string sanitizedDeviceName = SanitizeFileName(deviceName);
+        string deviceFolder = Path.Combine(basePath, sanitizedDeviceName);
 
-        string fileName = $"output_{DateTime.Now:yyyyMMdd_HHmmss}.wav";
-        string filePath = Path.Combine(deviceFolderPath, fileName);
+        if (!Directory.Exists(deviceFolder))
+        {
+            Directory.CreateDirectory(deviceFolder);
+        }
 
-        return filePath;
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
+        string fileName = $"Recording_{timestamp}.wav";
+
+        return Path.Combine(deviceFolder, fileName);
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return "Default";
+        }
+
+        string sanitized = InvalidFileNameCharsRegex().Replace(fileName, "_");
+
+        if (sanitized.Length > 50)
+        {
+            sanitized = sanitized[..50];
+        }
+
+        return sanitized.Trim();
     }
 }

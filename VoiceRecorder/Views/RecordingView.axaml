@@ -9,67 +9,74 @@
              x:DataType="vm:RecordingViewModel">
 
     <StackPanel Margin="10">
-        <controls:AudioVisualizerControl 
-            Height="100" 
+        <controls:AudioVisualizerControl
+            Height="100"
             Margin="0,10,0,0"
-            IsActive="{Binding IsRecording}"/>
-            
+            IsActive="{Binding IsRecording}" />
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button Command="{Binding StartRecordingCommand}" 
+            <Button Command="{Binding StartRecordingCommand}"
                     Margin="0,10,10,0"
-                    IsEnabled="{Binding !IsRecording}">
+                    IsEnabled="{Binding !IsRecording}"
+                    ToolTip.Tip="Start Recording">
                 <Image Source="{SvgImage /Assets/play.svg}" Width="25" Height="25" />
             </Button>
 
-            <Button Command="{Binding StopRecordingCommand}" 
-                    IsEnabled="{Binding IsRecording}" 
-                    Margin="10,10,0,0">
+            <Button Command="{Binding StopRecordingCommand}"
+                    IsEnabled="{Binding IsRecording}"
+                    Margin="10,10,0,0"
+                    ToolTip.Tip="Stop Recording">
                 <Image Source="{SvgImage /Assets/pause.svg}" Width="25" Height="25" />
             </Button>
         </StackPanel>
 
         <Grid ColumnDefinitions="*, 15, *" Margin="0,20,0,0">
             <StackPanel Grid.Column="0" Margin="10,0">
-                <Label Content="FILTERS" 
-                       Foreground="White" 
+                <Label Content="FILTERS"
+                       Foreground="White"
                        HorizontalAlignment="Center"
                        Margin="0,0,0,10" />
-                <ListBox x:Name="FilterList" 
-                         SelectedIndex="-1" 
+                <ListBox x:Name="FilterList"
+                         SelectedIndex="-1"
                          ItemsSource="{Binding AvailableFilters}"
-                         SelectedItem="{Binding SelectedFilterViewModel}" />
+                         SelectedItem="{Binding SelectedFilterViewModel}"
+                         IsEnabled="{Binding !IsRecording}"
+                         ToolTip.Tip="{Binding FilterTooltip}" />
             </StackPanel>
 
-            <GridSplitter Grid.Column="1" 
-                          Background="#103" 
+            <GridSplitter Grid.Column="1"
+                          Background="#103"
                           ResizeDirection="Columns"
                           Width="1"
                           Margin="0,10" />
-              
+
             <StackPanel Grid.Column="2" Margin="10,0">
-                <Label Content="DEVICES" 
-                       Foreground="White" 
+                <Label Content="DEVICES"
+                       Foreground="White"
                        HorizontalAlignment="Center"
                        Margin="0,0,0,10" />
-                <ListBox x:Name="DeviceList" 
-                         SelectedIndex="0" 
+                <ListBox x:Name="DeviceList"
+                         SelectedIndex="0"
                          ItemsSource="{Binding AvailableDevices}"
-                         SelectedItem="{Binding SelectedDevice}" />
+                         SelectedItem="{Binding SelectedDevice}"
+                         IsEnabled="{Binding !IsRecording}"
+                         ToolTip.Tip="{Binding DeviceTooltip}" />
             </StackPanel>
         </Grid>
 
-        <Button Command="{Binding OpenFolderCommand}" 
-                HorizontalAlignment="Center" 
-                Margin="0,25,0,0">
+        <Button Command="{Binding OpenFolderCommand}"
+                HorizontalAlignment="Center"
+                Margin="0,25,0,0"
+                ToolTip.Tip="Open Recordings Folder">
             <Image Source="{SvgImage /Assets/folder-plus.svg}" Width="25" Height="25" />
         </Button>
-        
-        <Label x:Name="TimerLabel" 
-               Content="{Binding TimerText}" 
+
+        <Label x:Name="TimerLabel"
+               Content="{Binding TimerText}"
                HorizontalAlignment="Center"
                FontSize="24"
                Foreground="#80F"
                FontWeight="Bold"
-               Margin="0,5,0,0"/>
+               Margin="0,5,0,0" />
     </StackPanel>
 </UserControl>

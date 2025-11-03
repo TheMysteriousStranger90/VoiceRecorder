@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reactive;
@@ -6,19 +7,22 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
+using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;
 
 internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
 {
-    private readonly AudioPlayer _player;
+    private readonly IAudioPlayer _player;
     private string _currentPlayingFile = string.Empty;
     private bool _isPlaying;
     private bool _isActuallyPlaying;
     private string _playbackStatus = string.Empty;
     private float _volume = 1.0f;
     private bool _disposed;
+    private CancellationTokenSource? _loadCancellationTokenSource;
 
     public bool IsPlaying
     {
@@ -71,73 +75,139 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         StatusChanged?.Invoke(this, new StatusChangedEventArgs(message));
     }
 
-    public FileExplorerViewModel()
+    public FileExplorerViewModel(IAudioPlayer? player = null)
     {
-        _player = new AudioPlayer();
+        _player = player ?? new AudioPlayer();
         _player.PlaybackStatusChanged += OnPlaybackStatusChanged;
 
         OpenFileCommand = ReactiveCommand.Create<AudioFileItem>(OpenFile);
         PlayFileCommand = ReactiveCommand.Create<AudioFileItem>(PlayFile);
-        DeleteFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(DeleteFileAsync);
+        DeleteFileCommand = ReactiveCommand.Create<AudioFileItem>(DeleteFile);
         RefreshFilesCommand = ReactiveCommand.Create(LoadFoldersAndFiles);
         PlayPauseCommand = ReactiveCommand.Create(PlayPause);
         StopCommand = ReactiveCommand.Create(Stop);
+
         LoadFoldersAndFiles();
     }
 
     public void LoadFoldersAndFiles()
     {
-        UpdateStatus("Loading files...");
-        Files.Clear();
-        Folders.Clear();
+        _loadCancellationTokenSource?.Cancel();
+        _loadCancellationTokenSource?.Dispose();
+        _loadCancellationTokenSource = new CancellationTokenSource();
 
-        string basePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        var cancellationToken = _loadCancellationTokenSource.Token;
+
+        UpdateStatus("Loading files...");
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            Files.Clear();
+            Folders.Clear();
+        });
+
+        string basePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "VoiceRecorder");
 
         if (!Directory.Exists(basePath))
         {
-            Directory.CreateDirectory(basePath);
-            UpdateStatus("Created VoiceRecorder directory.");
-            return;
-        }
+            try
+            {
+                Directory.CreateDirectory(basePath);
+                UpdateStatus("Created VoiceRecorder directory.");
+            }
+            catch (IOException ioEx)
+            {
+                UpdateStatus($"I/O error creating directory: {ioEx.Message}");
+                Debug.WriteLine($"I/O error creating directory: {ioEx.Message}");
+            }
+            catch (UnauthorizedAccessException uaEx)
+            {
+                UpdateStatus($"Access denied creating directory: {uaEx.Message}");
+                Debug.WriteLine($"Access denied creating directory: {uaEx.Message}");
+            }
+            catch (NotSupportedException nsEx)
+            {
+                UpdateStatus($"Invalid path for directory: {nsEx.Message}");
+                Debug.WriteLine($"Invalid path: {nsEx.Message}");
+            }
 
-        var directories = Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories);
-        foreach (var directory in directories)
-        {
-            Folders.Add(directory.Substring(basePath.Length + 1));
+            return;
         }
 
         Observable.Start(() =>
             {
-                var loadedFiles = new System.Collections.Generic.List<AudioFileItem>();
-                var files = Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories);
-                foreach (var file in files)
+                try
                 {
-                    try
-                    {
-                        loadedFiles.Add(new AudioFileItem(file, basePath));
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
-                    }
-                    catch (IOException ex)
-                    {
-                        Debug.WriteLine($"IO error loading file info for {file}: {ex.Message}");
-                    }
-                }
+                    if (cancellationToken.IsCancellationRequested)
+                        return (new List<string>(), new List<AudioFileItem>());
 
-                return loadedFiles.OrderBy(f => f.DateCreated).ToList();
+                    var directories = Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories)
+                        .Select(d => Path.GetRelativePath(basePath, d))
+                        .ToList();
+
+                    if (cancellationToken.IsCancellationRequested)
+                        return (directories, new List<AudioFileItem>());
+
+                    var loadedFiles = new List<AudioFileItem>();
+                    var files = Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories);
+
+                    foreach (var file in files)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        try
+                        {
+                            loadedFiles.Add(new AudioFileItem(file, basePath));
+                        }
+                        catch (ArgumentException argEx)
+                        {
+                            Debug.WriteLine($"Invalid argument loading file info for {file}: {argEx.Message}");
+                        }
+                        catch (IOException ioEx)
+                        {
+                            Debug.WriteLine($"I/O error loading file info for {file}: {ioEx.Message}");
+                        }
+                        catch (UnauthorizedAccessException uaEx)
+                        {
+                            Debug.WriteLine($"Access denied loading file info for {file}: {uaEx.Message}");
+                        }
+                    }
+
+                    return (directories, loadedFiles.OrderByDescending(f => f.DateCreated).ToList());
+                }
+                catch (IOException ioEx)
+                {
+                    Debug.WriteLine($"I/O error in LoadFoldersAndFiles: {ioEx.Message}");
+                    return (new List<string>(), new List<AudioFileItem>());
+                }
+                catch (UnauthorizedAccessException uaEx)
+                {
+                    Debug.WriteLine($"Access denied in LoadFoldersAndFiles: {uaEx.Message}");
+                    return (new List<string>(), new List<AudioFileItem>());
+                }
             }, RxApp.TaskpoolScheduler)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(loadedFiles =>
+            .Subscribe(result =>
             {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                var (directories, loadedFiles) = result;
+
+                foreach (var directory in directories)
+                {
+                    Folders.Add(directory);
+                }
+
                 foreach (var fileItem in loadedFiles)
                 {
                     Files.Add(fileItem);
                 }
 
-                UpdateStatus(Files.Count != 0 ? "Files loaded." : "No audio files found.");
+                UpdateStatus(Files.Count != 0 ? $"{Files.Count} file(s) loaded." : "No audio files found.");
             }, ex =>
             {
                 UpdateStatus($"Error loading files: {ex.Message}");
@@ -145,7 +215,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
             });
     }
 
-    private async Task DeleteFileAsync(AudioFileItem? fileItem)
+    private void DeleteFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
 
@@ -158,29 +228,34 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                 Stop();
             }
 
+            if (!File.Exists(fileItem.FullPath))
+            {
+                UpdateStatus($"File '{fileItem.Name}' not found.");
+                Files.Remove(fileItem);
+                return;
+            }
+
             File.Delete(fileItem.FullPath);
             Files.Remove(fileItem);
             UpdateStatus($"File '{fileItem.Name}' deleted.");
         }
-        catch (IOException ex)
+        catch (IOException ioEx)
         {
-            UpdateStatus($"Error deleting file '{fileItem.Name}': {ex.Message}");
-            Debug.WriteLine($"Error deleting file: {ex.Message}");
+            UpdateStatus($"I/O error deleting file '{fileItem.Name}': {ioEx.Message}");
+            Debug.WriteLine($"I/O error deleting file: {ioEx.Message}");
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException uaEx)
         {
-            UpdateStatus($"Access denied deleting file '{fileItem.Name}': {ex.Message}");
-            Debug.WriteLine($"Access denied deleting file: {ex.Message}");
+            UpdateStatus($"Access denied deleting file '{fileItem.Name}': {uaEx.Message}");
+            Debug.WriteLine($"Access denied deleting file: {uaEx.Message}");
         }
-
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private void PlayPause()
     {
         if (IsPlaying)
         {
-            _player.Stop();
+            _player.StopFile();
         }
         else if (!string.IsNullOrEmpty(CurrentPlayingFile))
         {
@@ -194,25 +269,37 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
 
     private void Stop()
     {
-        _player.Stop();
+        _player.StopFile();
     }
 
     private void OpenFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
+
+        if (!File.Exists(fileItem.FullPath))
+        {
+            UpdateStatus($"File not found: {fileItem.Name}");
+            return;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo(fileItem.FullPath) { UseShellExecute = true });
         }
-        catch (System.ComponentModel.Win32Exception ex)
+        catch (Win32Exception w32Ex)
         {
-            UpdateStatus($"Error opening file: {ex.Message}");
-            Debug.WriteLine($"Error opening file: {ex.Message}");
+            UpdateStatus($"Error opening file: {w32Ex.Message}");
+            Debug.WriteLine($"Win32 error opening file: {w32Ex.Message}");
         }
-        catch (IOException ex)
+        catch (FileNotFoundException fnfEx)
         {
-            UpdateStatus($"IO error opening file: {ex.Message}");
-            Debug.WriteLine($"IO error opening file: {ex.Message}");
+            UpdateStatus($"File not found: {fnfEx.Message}");
+            Debug.WriteLine($"File not found: {fnfEx.Message}");
+        }
+        catch (IOException ioEx)
+        {
+            UpdateStatus($"I/O error opening file: {ioEx.Message}");
+            Debug.WriteLine($"I/O error opening file: {ioEx.Message}");
         }
     }
 
@@ -251,6 +338,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                 UpdateStatus($"Error: {e.ErrorMessage}");
                 Debug.WriteLine($"Playback error: {e.ErrorMessage}");
                 IsPlaying = false;
+                IsActuallyPlaying = false;
             }
         });
     }
@@ -258,6 +346,12 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     private void PlayFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
+
+        if (!File.Exists(fileItem.FullPath))
+        {
+            UpdateStatus($"File not found: {fileItem.Name}");
+            return;
+        }
 
         string requestedFileName = fileItem.Name;
 
@@ -286,6 +380,10 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         {
             if (disposing)
             {
+                _loadCancellationTokenSource?.Cancel();
+                _loadCancellationTokenSource?.Dispose();
+                _loadCancellationTokenSource = null;
+
                 _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
                 _player?.Dispose();
             }
