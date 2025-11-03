@@ -1,6 +1,8 @@
 ﻿using System.Windows.Input;
 using ReactiveUI;
+using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;
 
@@ -9,6 +11,8 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _statusMessage = string.Empty;
     private ViewModelBase _currentView;
     private bool _disposed;
+    private readonly IThemeService _themeService;
+    private bool _isLightTheme;
 
     public string StatusMessage
     {
@@ -32,16 +36,37 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool IsLightTheme
+    {
+        get => _isLightTheme;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _isLightTheme, value);
+            _themeService.SetTheme(value ? ThemeVariant.Second : ThemeVariant.Main);
+        }
+    }
+
     public ICommand ShowRecordingViewCommand { get; }
     public ICommand ShowFileExplorerCommand { get; }
+    public ICommand ToggleThemeCommand { get; }
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(IThemeService? themeService = null)
     {
+        _themeService = themeService ?? new ThemeService();
+        _isLightTheme = _themeService.CurrentTheme == ThemeVariant.Second;
+
         ShowRecordingViewCommand = ReactiveCommand.Create(ShowRecordingView);
         ShowFileExplorerCommand = ReactiveCommand.Create(ShowFileExplorer);
+        ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme);
 
         _currentView = new RecordingViewModel();
         ShowRecordingView();
+    }
+
+    private void ToggleTheme()
+    {
+        IsLightTheme = !IsLightTheme;
+        StatusMessage = IsLightTheme ? "Switched to Second Theme" : "Switched to Main Theme";
     }
 
     private void ShowRecordingView()

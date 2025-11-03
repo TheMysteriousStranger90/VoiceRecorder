@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAudioRecorder, AudioRecorder>();
         services.AddTransient<IAudioPlayer, AudioPlayer>();
 
+        services.AddSingleton<IThemeService, ThemeService>();
         return services;
     }
 }

@@ -11,9 +11,9 @@
         Icon="/Assets/icon.ico"
         Opacity="0.9"
         Title="Voice Recorder">
-    
+
     <Window.Styles>
-        <StyleInclude Source="/Styles/Styles.axaml" />
+        <StyleInclude Source="/Styles/MainTheme.axaml" />
     </Window.Styles>
 
     <Grid>
@@ -25,36 +25,55 @@
         <!-- Navigation Panel -->
         <Border Classes="panel" Grid.Column="0" Margin="8,16,4,16">
             <StackPanel Spacing="8">
+                <!-- Recording View Button -->
                 <Button Classes="navButton"
-                        Command="{Binding ShowRecordingViewCommand}">
+                        Command="{Binding ShowRecordingViewCommand}"
+                        ToolTip.Tip="Recording">
                     <PathIcon Data="{StaticResource RecordIcon}"
                              Width="20"
                              Height="20" />
                 </Button>
+
+                <!-- File Explorer Button -->
                 <Button Classes="navButton"
-                        Command="{Binding ShowFileExplorerCommand}">
+                        Command="{Binding ShowFileExplorerCommand}"
+                        ToolTip.Tip="Files">
                     <PathIcon Data="{StaticResource FolderIcon}"
+                             Width="20"
+                             Height="20" />
+                </Button>
+
+                <!-- Theme Toggle Button -->
+                <Button Classes="navButton"
+                        Command="{Binding ToggleThemeCommand}"
+                        ToolTip.Tip="Toggle Theme">
+                    <PathIcon Data="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
                              Width="20"
                              Height="20" />
                 </Button>
             </StackPanel>
         </Border>
 
-        <!-- Status Bar -->
-        <Border Grid.Column="1" DockPanel.Dock="Bottom" 
-                CornerRadius="10" Background="#80F" 
-                Margin="20,0,20,16" Height="35"
-                VerticalAlignment="Bottom">
-            <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="White" 
-                       FontSize="14" 
-                       TextAlignment="Center"
-                       VerticalAlignment="Center"/>
-        </Border>
+        <!-- Main Content Area -->
+        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+            <!-- Content Area -->
+            <ContentControl Grid.Row="0"
+                           Content="{Binding CurrentView}"
+                           Margin="8,16,16,16" />
 
-        <!-- Content Area -->
-        <ContentControl Grid.Column="1"
-                       Content="{Binding CurrentView}"
-                       Margin="8,16,16,60" />
+            <!-- Status Bar -->
+            <Border Grid.Row="1"
+                    CornerRadius="10"
+                    Background="#80F"
+                    Margin="20,0,20,16"
+                    Height="35"
+                    VerticalAlignment="Bottom">
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="White"
+                           FontSize="14"
+                           TextAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
