@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reactive;
@@ -14,20 +14,22 @@ using VoiceRecorder.Models;
 
 namespace VoiceRecorder.ViewModels;
 
-public class FileExplorerViewModel : ViewModelBase, IDisposable
+internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
 {
     private readonly AudioPlayer _player;
-    private string _currentPlayingFile;
+    private string _currentPlayingFile = string.Empty;
     private bool _isPlaying;
     private bool _isActuallyPlaying;
-    private string _playbackStatus;
+    private string _playbackStatus = string.Empty;
+    private float _volume = 1.0f;
+    private bool _disposed;
 
     public bool IsPlaying
     {
         get => _isPlaying;
         private set => this.RaiseAndSetIfChanged(ref _isPlaying, value);
     }
-    
+
     public bool IsActuallyPlaying
     {
         get => _isActuallyPlaying;
@@ -46,8 +48,6 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _playbackStatus, value);
     }
 
-    private float _volume = 1.0f;
-
     public float Volume
     {
         get => _volume;
@@ -58,8 +58,8 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public ObservableCollection<string> Folders { get; } = new ObservableCollection<string>();
-    public ObservableCollection<AudioFileItem> Files { get; } = new ObservableCollection<AudioFileItem>();
+    public ObservableCollection<string> Folders { get; } = [];
+    public ObservableCollection<AudioFileItem> Files { get; } = [];
 
     public ReactiveCommand<AudioFileItem, Unit> OpenFileCommand { get; }
     public ReactiveCommand<AudioFileItem, Unit> PlayFileCommand { get; }
@@ -67,11 +67,12 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> RefreshFilesCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand StopCommand { get; }
-    public event EventHandler<string> StatusChanged;
+
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     private void UpdateStatus(string message)
     {
-        StatusChanged?.Invoke(this, message);
+        StatusChanged?.Invoke(this, new StatusChangedEventArgs(message));
     }
 
     public FileExplorerViewModel()
@@ -104,23 +105,29 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        foreach (var directory in Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories))
+        var directories = Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories);
+        foreach (var directory in directories)
         {
             Folders.Add(directory.Substring(basePath.Length + 1));
         }
 
         Observable.Start(() =>
             {
-                var loadedFiles = new List<AudioFileItem>();
-                foreach (var file in Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories))
+                var loadedFiles = new System.Collections.Generic.List<AudioFileItem>();
+                var files = Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories);
+                foreach (var file in files)
                 {
                     try
                     {
                         loadedFiles.Add(new AudioFileItem(file, basePath));
                     }
-                    catch (Exception ex)
+                    catch (ArgumentException ex)
                     {
                         Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
+                    }
+                    catch (IOException ex)
+                    {
+                        Debug.WriteLine($"IO error loading file info for {file}: {ex.Message}");
                     }
                 }
                 return loadedFiles.OrderBy(f => f.DateCreated).ToList();
@@ -133,7 +140,7 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
                     Files.Add(fileItem);
                 }
 
-                UpdateStatus(Files.Any() ? "Files loaded." : "No audio files found.");
+                UpdateStatus(Files.Count != 0 ? "Files loaded." : "No audio files found.");
             }, ex =>
             {
                 UpdateStatus($"Error loading files: {ex.Message}");
@@ -141,11 +148,11 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
             });
     }
 
-    private async Task DeleteFileAsync(AudioFileItem fileItem)
+    private async Task DeleteFileAsync(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
 
-        Debug.WriteLine($"Attempting to delete: {fileItem.FullPath}");
+        Debug.WriteLine(string.Format(CultureInfo.InvariantCulture, "Attempting to delete: {0}", fileItem.FullPath));
 
         try
         {
@@ -158,11 +165,18 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
             Files.Remove(fileItem);
             UpdateStatus($"File '{fileItem.Name}' deleted.");
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
             UpdateStatus($"Error deleting file '{fileItem.Name}': {ex.Message}");
             Debug.WriteLine($"Error deleting file: {ex.Message}");
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            UpdateStatus($"Access denied deleting file '{fileItem.Name}': {ex.Message}");
+            Debug.WriteLine($"Access denied deleting file: {ex.Message}");
+        }
+
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private void PlayPause()
@@ -186,66 +200,70 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         _player.Stop();
     }
 
-    private void OpenFile(AudioFileItem fileItem)
+    private void OpenFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
         try
         {
             Process.Start(new ProcessStartInfo(fileItem.FullPath) { UseShellExecute = true });
         }
-        catch (Exception ex)
+        catch (System.ComponentModel.Win32Exception ex)
         {
             UpdateStatus($"Error opening file: {ex.Message}");
             Debug.WriteLine($"Error opening file: {ex.Message}");
         }
+        catch (IOException ex)
+        {
+            UpdateStatus($"IO error opening file: {ex.Message}");
+            Debug.WriteLine($"IO error opening file: {ex.Message}");
+        }
     }
 
-    private void OnPlaybackStatusChanged(object sender, PlaybackStatusEventArgs e)
+    private void OnPlaybackStatusChanged(object? sender, PlaybackStatusEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            this.CurrentPlayingFile = e.CurrentFile;
-            this.IsPlaying = (e.State == PlaybackState.Playing || e.State == PlaybackState.Paused);
-            this.IsActuallyPlaying = (e.State == PlaybackState.Playing); 
-            
+            CurrentPlayingFile = e.FileName;
+            IsPlaying = e.State == PlaybackState.Playing || e.State == PlaybackState.Paused;
+            IsActuallyPlaying = e.State == PlaybackState.Playing;
+
             switch (e.State)
             {
                 case PlaybackState.Playing:
-                    this.PlaybackStatus = $"Playing: {e.CurrentFile}";
-                    UpdateStatus($"Playing: {e.CurrentFile}");
+                    PlaybackStatus = $"Playing: {e.FileName}";
+                    UpdateStatus($"Playing: {e.FileName}");
                     break;
                 case PlaybackState.Paused:
-                    this.PlaybackStatus = $"Paused: {e.CurrentFile}";
-                    UpdateStatus($"Paused: {e.CurrentFile}");
+                    PlaybackStatus = $"Paused: {e.FileName}";
+                    UpdateStatus($"Paused: {e.FileName}");
                     break;
                 case PlaybackState.Stopped:
-                    this.PlaybackStatus = "Stopped";
+                    PlaybackStatus = "Stopped";
                     UpdateStatus("Playback stopped.");
-                    if (e.CurrentFile == null)
+                    if (string.IsNullOrEmpty(e.FileName))
                     {
-                        this.CurrentPlayingFile = null;
+                        CurrentPlayingFile = string.Empty;
                     }
-
                     break;
             }
 
             if (!string.IsNullOrEmpty(e.ErrorMessage))
             {
-                this.PlaybackStatus = $"Error: {e.ErrorMessage}";
+                PlaybackStatus = $"Error: {e.ErrorMessage}";
                 UpdateStatus($"Error: {e.ErrorMessage}");
                 Debug.WriteLine($"Playback error: {e.ErrorMessage}");
-                this.IsPlaying = false;
+                IsPlaying = false;
             }
         });
     }
 
-    private void PlayFile(AudioFileItem fileItem)
+    private void PlayFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
-        
+
         string requestedFileName = fileItem.Name;
-        
-        if (this.CurrentPlayingFile == requestedFileName && 
+
+        if (CurrentPlayingFile == requestedFileName &&
             (_player.CurrentPlaybackState == PlaybackState.Playing || _player.CurrentPlaybackState == PlaybackState.Paused))
         {
             if (_player.CurrentPlaybackState == PlaybackState.Playing)
@@ -257,15 +275,28 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
                 _player.ResumePlayback();
             }
         }
-        else 
+        else
         {
             _player.PlayFile(fileItem.FullPath);
         }
     }
 
+    private void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
+                _player?.Dispose();
+            }
+            _disposed = true;
+        }
+    }
+
     public void Dispose()
     {
-        _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
-        _player?.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

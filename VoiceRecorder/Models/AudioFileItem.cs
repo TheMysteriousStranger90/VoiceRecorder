@@ -1,22 +1,24 @@
-﻿using System;
-using System.IO;
+﻿using System.Globalization;
 using CSCore;
 using CSCore.Codecs;
 using ReactiveUI;
+using VoiceRecorder.Exceptions;
 
 namespace VoiceRecorder.Models;
 
-public class AudioFileItem : ReactiveObject
+internal sealed class AudioFileItem : ReactiveObject
 {
     private string _name;
+    private string _relativePath;
+    private DateTime _dateCreated;
+    private long _size;
+    private TimeSpan _duration;
 
     public string Name
     {
         get => _name;
         set => this.RaiseAndSetIfChanged(ref _name, value);
     }
-
-    private string _relativePath;
 
     public string RelativePath
     {
@@ -26,15 +28,11 @@ public class AudioFileItem : ReactiveObject
 
     public string FullPath { get; }
 
-    private DateTime _dateCreated;
-
     public DateTime DateCreated
     {
         get => _dateCreated;
         set => this.RaiseAndSetIfChanged(ref _dateCreated, value);
     }
-
-    private long _size;
 
     public long Size
     {
@@ -42,9 +40,7 @@ public class AudioFileItem : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _size, value);
     }
 
-    public string FormattedSize => $"{(_size / 1024.0):F2} KB";
-
-    private TimeSpan _duration;
+    public string FormattedSize => $"{(_size / 1024.0).ToString("F2", CultureInfo.InvariantCulture)} KB";
 
     public TimeSpan Duration
     {
@@ -52,29 +48,32 @@ public class AudioFileItem : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _duration, value);
     }
 
-    public string FormattedDuration => $"{_duration:mm\\:ss}";
+    public string FormattedDuration => _duration.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
 
     public AudioFileItem(string fullPath, string basePath)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
+
         FullPath = fullPath;
-        Name = Path.GetFileName(fullPath);
-        RelativePath =
-            fullPath.Substring(basePath.Length + (basePath.EndsWith(Path.DirectorySeparatorChar.ToString()) ? 0 : 1));
+        _name = Path.GetFileName(fullPath);
+        _relativePath = fullPath.Substring(basePath.Length +
+                           (basePath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                               ? 0
+                               : 1));
 
         var fileInfo = new FileInfo(fullPath);
-        DateCreated = fileInfo.CreationTime;
-        Size = fileInfo.Length;
+        _dateCreated = fileInfo.CreationTime;
+        _size = fileInfo.Length;
 
         try
         {
-            using (IWaveSource waveSource = CodecFactory.Instance.GetCodec(fullPath))
-            {
-                Duration = waveSource.GetLength();
-            }
+            using IWaveSource waveSource = CodecFactory.Instance.GetCodec(fullPath);
+            _duration = waveSource.GetLength();
         }
-        catch (Exception)
+        catch (UnsupportedCodecException)
         {
-            Duration = TimeSpan.Zero;
+            _duration = TimeSpan.Zero;
         }
     }
 }

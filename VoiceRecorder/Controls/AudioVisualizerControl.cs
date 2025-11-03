@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
+using System.Security.Cryptography;
 
 namespace VoiceRecorder.Controls;
 
@@ -12,19 +11,19 @@ public class AudioVisualizerControl : TemplatedControl
     private readonly List<double> _barHeights;
     private readonly DispatcherTimer _timer;
     private const int BarCount = 32;
-    private readonly Random _random;
+    private readonly RandomNumberGenerator _random;
 
     public static readonly StyledProperty<bool> IsActiveProperty =
         AvaloniaProperty.Register<AudioVisualizerControl, bool>(
             nameof(IsActive),
             defaultValue: false);
 
-    public static readonly StyledProperty<CornerRadius> CornerRadiusProperty =
+    public new static readonly StyledProperty<CornerRadius> CornerRadiusProperty =
         AvaloniaProperty.Register<AudioVisualizerControl, CornerRadius>(
             nameof(CornerRadius),
             new CornerRadius(0));
 
-    public CornerRadius CornerRadius
+    public new CornerRadius CornerRadius
     {
         get => GetValue(CornerRadiusProperty);
         set => SetValue(CornerRadiusProperty, value);
@@ -38,7 +37,7 @@ public class AudioVisualizerControl : TemplatedControl
 
     public AudioVisualizerControl()
     {
-        _random = new Random();
+        _random = RandomNumberGenerator.Create();
         _barHeights = new List<double>(BarCount);
         for (int i = 0; i < BarCount; i++)
         {
@@ -53,7 +52,7 @@ public class AudioVisualizerControl : TemplatedControl
         _timer.Start();
     }
 
-    private void Timer_Tick(object sender, EventArgs e)
+    private void Timer_Tick(object? sender, EventArgs e)
     {
         UpdateBars();
         InvalidateVisual();
@@ -66,7 +65,7 @@ public class AudioVisualizerControl : TemplatedControl
             if (IsActive)
             {
                 _barHeights[i] = Math.Max(0.1, Math.Min(1.0,
-                    _barHeights[i] + (_random.NextDouble() * 0.2 - 0.1)));
+                    _barHeights[i] + (GetSecureRandomDouble() * 0.2 - 0.1)));
             }
             else
             {
@@ -75,8 +74,18 @@ public class AudioVisualizerControl : TemplatedControl
         }
     }
 
+    private double GetSecureRandomDouble()
+    {
+        var bytes = new byte[8];
+        _random.GetBytes(bytes);
+        ulong uint64 = BitConverter.ToUInt64(bytes, 0) / (1UL << 11);
+        return uint64 / (double)(1UL << 53);
+    }
+
     public override void Render(DrawingContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var rect = new Rect(Bounds.Size);
         context.FillRectangle(Brushes.Transparent, rect);
 
@@ -95,11 +104,11 @@ public class AudioVisualizerControl : TemplatedControl
             {
                 StartPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
                 EndPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                GradientStops = new GradientStops
-                {
+                GradientStops =
+                [
                     new GradientStop(Colors.Purple, 0),
                     new GradientStop(Colors.Magenta, 1)
-                }
+                ]
             };
 
             context.FillRectangle(gradient, barRect);

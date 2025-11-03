@@ -17,6 +17,11 @@ public class VoiceFilter
     public void ApplyFilter()
     {
         var source = _recorder.CaptureSource;
+        if (source == null)
+        {
+            throw new InvalidOperationException("Capture source cannot be null.");
+        }
+
         var filteredSource = _filterStrategy.ApplyFilter(source);
         _recorder.UpdateSource(filteredSource);
     }

@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
+using System.Globalization;
 using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
@@ -12,27 +11,30 @@ using VoiceRecorder.Utils;
 
 namespace VoiceRecorder.ViewModels;
 
-public class RecordingViewModel : ViewModelBase
+internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 {
     private readonly AudioRecorder _recorder;
     private readonly AudioDevice _device;
     private readonly DispatcherTimer _timer;
     private TimeSpan _time;
-    private string _timerText;
+    private string _timerText = "00:00:00";
+    private bool _isRecording;
+    private VoiceFilterViewModel _selectedFilterViewModel;
+    private string _selectedDevice = string.Empty;
+    private bool _disposed;
 
-    public List<VoiceFilterViewModel> AvailableFilters { get; }
-    public List<string> AvailableDevices { get; }
+    public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
+    public ObservableCollection<string> AvailableDevices { get; }
     public ICommand StartRecordingCommand { get; }
     public ICommand StopRecordingCommand { get; }
     public ICommand OpenFolderCommand { get; }
-    public event EventHandler<string> StatusChanged;
+
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     private void UpdateStatus(string message)
     {
-        StatusChanged?.Invoke(this, message);
+        StatusChanged?.Invoke(this, new StatusChangedEventArgs(message));
     }
-
-    private bool _isRecording;
 
     public bool IsRecording
     {
@@ -46,15 +48,11 @@ public class RecordingViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _timerText, value);
     }
 
-    private VoiceFilterViewModel _selectedFilterViewModel;
-
     public VoiceFilterViewModel SelectedFilterViewModel
     {
         get => _selectedFilterViewModel;
         set => this.RaiseAndSetIfChanged(ref _selectedFilterViewModel, value);
     }
-
-    private string _selectedDevice;
 
     public string SelectedDevice
     {
@@ -67,15 +65,18 @@ public class RecordingViewModel : ViewModelBase
         _recorder = new AudioRecorder();
         _device = new AudioDevice();
 
-        AvailableDevices = _device.GetAvailableDevices();
+        var devices = _device.GetAvailableDevices();
+        AvailableDevices = new ObservableCollection<string>(devices);
 
-        AvailableFilters = new List<VoiceFilterViewModel>
+        AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
-            new VoiceFilterViewModel(null, null),
-            new VoiceFilterViewModel(null, new EchoFilter()),
-            new VoiceFilterViewModel(null, new FlangerFilter()),
-            new VoiceFilterViewModel(null, new DistortionFilter())
+            new VoiceFilterViewModel(null!, null!),
+            new VoiceFilterViewModel(null!, new EchoFilter()),
+            new VoiceFilterViewModel(null!, new FlangerFilter()),
+            new VoiceFilterViewModel(null!, new DistortionFilter())
         };
+
+        _selectedFilterViewModel = AvailableFilters[0];
 
         StartRecordingCommand = ReactiveCommand.Create(StartRecording);
         StopRecordingCommand = ReactiveCommand.Create(StopRecording);
@@ -86,20 +87,23 @@ public class RecordingViewModel : ViewModelBase
             Interval = TimeSpan.FromSeconds(1)
         };
         _timer.Tick += Timer_Tick;
-        TimerText = "00:00:00";
     }
 
-    private void Timer_Tick(object sender, EventArgs e)
+    private void Timer_Tick(object? sender, EventArgs e)
     {
         _time = _time.Add(TimeSpan.FromSeconds(1));
-        TimerText = _time.ToString(@"hh\:mm\:ss");
+        TimerText = _time.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
     }
 
     private void StartRecording()
     {
         try
         {
-            if (SelectedDevice == null) return;
+            if (string.IsNullOrEmpty(SelectedDevice))
+            {
+                UpdateStatus("Please select a device");
+                return;
+            }
 
             _time = TimeSpan.Zero;
             TimerText = "00:00:00";
@@ -120,18 +124,15 @@ public class RecordingViewModel : ViewModelBase
             IsRecording = true;
             UpdateStatus("Recording started");
         }
-
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
             UpdateStatus("Please enable microphone access in Windows Privacy Settings");
+            Debug.WriteLine($"Microphone access denied: {ex.Message}");
         }
-        catch (AudioRecorderException)
+        catch (AudioRecorderException ex)
         {
             UpdateStatus("Failed to start recording. Please check your microphone.");
-        }
-        catch (Exception)
-        {
-            UpdateStatus("An unexpected error occurred");
+            Debug.WriteLine($"Recording error: {ex.Message}");
         }
     }
 
@@ -151,12 +152,45 @@ public class RecordingViewModel : ViewModelBase
 
         if (Directory.Exists(folderPath))
         {
-            Process.Start(new ProcessStartInfo
+            try
             {
-                FileName = folderPath,
-                UseShellExecute = true,
-                Verb = "open"
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = folderPath,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                UpdateStatus($"Failed to open folder: {ex.Message}");
+                Debug.WriteLine($"Error opening folder: {ex.Message}");
+            }
         }
+        else
+        {
+            UpdateStatus("Folder does not exist");
+        }
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _timer.Stop();
+                _timer.Tick -= Timer_Tick;
+                _recorder?.Dispose();
+                _device?.Dispose();
+            }
+            _disposed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

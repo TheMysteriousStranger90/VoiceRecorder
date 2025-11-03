@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Threading;
-using VoiceRecorder.Models;
 using VoiceRecorder.ViewModels;
 
 namespace VoiceRecorder.Views;

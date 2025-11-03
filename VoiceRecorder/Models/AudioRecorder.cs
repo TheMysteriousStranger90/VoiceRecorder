@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
@@ -12,32 +11,31 @@ namespace VoiceRecorder.Models;
 
 public sealed class AudioRecorder : IDisposable
 {
-    private WasapiCapture _capture;
-    private WaveWriter _writer;
-    private bool _disposed = false;
-    private SoundInSource _soundInSource;
+    private WasapiCapture? _capture;
+    private WaveWriter? _writer;
+    private bool _disposed;
+    private SoundInSource? _soundInSource;
 
-    public IWaveSource CaptureSource => _soundInSource;
+    public IWaveSource? CaptureSource => _soundInSource;
 
-    public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter filter)
+    public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter? filter)
     {
+        ArgumentNullException.ThrowIfNull(outputFilePath);
+        ArgumentNullException.ThrowIfNull(device);
+
         try
         {
-            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
-            _capture.Device = device;
+            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100)
+            {
+                Device = device
+            };
             _capture.Initialize();
 
             _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
 
-            IWaveSource filteredSource;
-            if (filter != null)
-            {
-                filteredSource = filter.ApplyFilter((IWaveSource)_soundInSource);
-            }
-            else
-            {
-                filteredSource = _soundInSource;
-            }
+            IWaveSource filteredSource = filter != null
+                ? filter.ApplyFilter(_soundInSource)
+                : _soundInSource;
 
             _writer = new WaveWriter(outputFilePath, filteredSource.WaveFormat);
 
@@ -53,7 +51,7 @@ public sealed class AudioRecorder : IDisposable
 
             _capture.Start();
         }
-        catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005)) // Access Denied
+        catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
         {
             throw new UnauthorizedAccessException("Microphone access is denied. Please check your privacy settings.", ex);
         }
@@ -62,33 +60,52 @@ public sealed class AudioRecorder : IDisposable
             throw new AudioRecorderException("Failed to start recording", ex);
         }
     }
-    
+
     public void StopRecording()
     {
-        try
+        if (_capture != null)
         {
-            _capture.Stop();
-            _writer.Dispose();
+            try
+            {
+                _capture.Stop();
+            }
+            catch (CoreAudioAPIException ex)
+            {
+                Debug.WriteLine($"Error stopping capture: {ex.Message}");
+                throw new AudioRecorderException("Failed to stop capture", ex);
+            }
         }
-        catch (Exception ex)
+
+        if (_writer != null)
         {
-            Console.WriteLine($"An error occurred: {ex.Message}");
+            try
+            {
+                _writer.Dispose();
+                _writer = null;
+            }
+            catch (System.IO.IOException ex)
+            {
+                Debug.WriteLine($"Error disposing writer: {ex.Message}");
+                throw new AudioRecorderException("Failed to finalize recording", ex);
+            }
         }
     }
 
     public void UpdateSource(IWaveSource newSource)
     {
-        _capture.Stop();
+        ArgumentNullException.ThrowIfNull(newSource);
+
+        _capture?.Stop();
 
         _soundInSource = newSource as SoundInSource;
 
         if (_soundInSource != null)
         {
-            _capture.Start();
+            _capture?.Start();
         }
         else
         {
-            Console.WriteLine("newSource is not a SoundInSource");
+            Debug.WriteLine("newSource is not a SoundInSource");
         }
     }
 
@@ -98,6 +115,9 @@ public sealed class AudioRecorder : IDisposable
         {
             if (disposing)
             {
+                _soundInSource?.Dispose();
+                _soundInSource = null;
+
                 if (_capture != null)
                 {
                     _capture.Dispose();

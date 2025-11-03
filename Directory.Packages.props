@@ -1,0 +1,27 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- Avalonia UI Framework -->
+        <PackageVersion Include="Avalonia" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Desktop" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Svg.Skia" Version="11.3.0" />
+        <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.ReactiveUI" Version="11.3.8" />
+
+        <!-- Dependency Injection -->
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
+        <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
+
+        <!-- Audio Processing -->
+        <PackageVersion Include="CSCore" Version="1.2.1.2" />
+        <PackageVersion Include="CSCore.Ffmpeg" Version="1.2.0-beta1" />
+
+        <!-- Charts -->
+        <PackageVersion Include="LiveChartsCore.SkiaSharpView.Avalonia" Version="2.0.0-rc6.1" />
+    </ItemGroup>
+</Project>

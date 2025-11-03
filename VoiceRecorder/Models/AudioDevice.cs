@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
+﻿using System.Diagnostics;
 using CSCore.CoreAudioAPI;
 
 namespace VoiceRecorder.Models;
 
 public sealed class AudioDevice : IDisposable
 {
-    private MMDeviceEnumerator _mmdeviceEnumerator;
-    private bool _disposed = false;
+    private MMDeviceEnumerator? _mmdeviceEnumerator;
+    private bool _disposed;
 
     public AudioDevice()
     {
@@ -17,40 +14,54 @@ public sealed class AudioDevice : IDisposable
         {
             _mmdeviceEnumerator = new MMDeviceEnumerator();
         }
-        catch (Exception ex)
+        catch (CoreAudioAPIException ex)
         {
             Debug.WriteLine($"Error initializing MMDeviceEnumerator: {ex.Message}");
             throw;
         }
     }
 
-    public List<string> GetAvailableDevices()
+    public IReadOnlyList<string> GetAvailableDevices()
     {
         try
         {
-            return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                .Select(device => device.FriendlyName)
-                .ToList();
+            if (_mmdeviceEnumerator != null)
+                return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                    .Select(device => device.FriendlyName)
+                    .ToList();
         }
-        catch (Exception ex)
+        catch (CoreAudioAPIException ex)
         {
             Debug.WriteLine($"Error enumerating devices: {ex.Message}");
-            return new List<string>();
         }
+
+        return new List<string>();
     }
 
     public MMDevice SelectDevice(string deviceName)
     {
         try
         {
-            return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                .FirstOrDefault(device => device.FriendlyName == deviceName);
+            if (_mmdeviceEnumerator != null)
+            {
+                var device = _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                    .FirstOrDefault(device => device.FriendlyName == deviceName);
+
+                if (device == null)
+                {
+                    throw new InvalidOperationException($"Device with name '{deviceName}' not found.");
+                }
+
+                return device;
+            }
         }
-        catch (Exception ex)
+        catch (CoreAudioAPIException ex)
         {
             Debug.WriteLine($"Error selecting device: {ex.Message}");
-            return null;
+            throw;
         }
+
+        throw new InvalidOperationException("MMDeviceEnumerator is not initialized.");
     }
 
     private void Dispose(bool disposing)

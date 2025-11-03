@@ -3,9 +3,9 @@ using ReactiveUI;
 
 namespace VoiceRecorder.ViewModels;
 
-public class MainWindowViewModel : ViewModelBase
+internal sealed class MainWindowViewModel : ViewModelBase
 {
-    private string _statusMessage;
+    private string _statusMessage = string.Empty;
     private ViewModelBase _currentView;
 
     public string StatusMessage
@@ -22,11 +22,12 @@ public class MainWindowViewModel : ViewModelBase
             this.RaiseAndSetIfChanged(ref _currentView, value);
             if (value is RecordingViewModel recordingViewModel)
             {
-                recordingViewModel.StatusChanged += (s, message) => StatusMessage = message;
+                recordingViewModel.StatusChanged += (s, e) => StatusMessage = e.Message;
             }
+
             if (value is FileExplorerViewModel fileExplorerViewModel)
             {
-                fileExplorerViewModel.StatusChanged += (s, message) => StatusMessage = message;
+                fileExplorerViewModel.StatusChanged += (s, e) => StatusMessage = e.Message;
             }
         }
     }
@@ -39,6 +40,7 @@ public class MainWindowViewModel : ViewModelBase
         ShowRecordingViewCommand = ReactiveCommand.Create(ShowRecordingView);
         ShowFileExplorerCommand = ReactiveCommand.Create(ShowFileExplorer);
 
+        _currentView = new RecordingViewModel();
         ShowRecordingView();
     }
 
