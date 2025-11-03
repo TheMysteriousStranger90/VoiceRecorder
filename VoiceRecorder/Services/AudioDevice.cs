@@ -4,7 +4,7 @@ using VoiceRecorder.Interfaces;
 
 namespace VoiceRecorder.Services;
 
-public sealed class AudioDevice : IAudioDevice
+internal sealed class AudioDevice : IAudioDevice
 {
     private MMDeviceEnumerator? _mmdeviceEnumerator;
     private bool _disposed;
@@ -33,9 +33,17 @@ public sealed class AudioDevice : IAudioDevice
             {
                 if (_mmdeviceEnumerator != null)
                 {
-                    return _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                        .Select(device => device.FriendlyName)
+                    var devices = _mmdeviceEnumerator
+                        .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
                         .ToList();
+
+                    Debug.WriteLine($"Found {devices.Count} capture devices:");
+                    foreach (var device in devices)
+                    {
+                        Debug.WriteLine($"  - {device.FriendlyName} (ID: {device.DeviceID})");
+                    }
+
+                    return devices.Select(device => device.FriendlyName).ToList();
                 }
             }
             catch (CoreAudioAPIException ex)
@@ -59,13 +67,26 @@ public sealed class AudioDevice : IAudioDevice
             {
                 if (_mmdeviceEnumerator != null)
                 {
-                    var device = _mmdeviceEnumerator.EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                        .FirstOrDefault(device => device.FriendlyName == deviceName);
+                    var devices = _mmdeviceEnumerator
+                        .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                        .ToList();
+
+                    var device = devices.FirstOrDefault(d => d.FriendlyName == deviceName);
 
                     if (device == null)
                     {
+                        Debug.WriteLine($"Device '{deviceName}' not found. Available devices:");
+                        foreach (var d in devices)
+                        {
+                            Debug.WriteLine($"  - {d.FriendlyName}");
+                        }
                         throw new InvalidOperationException($"Device with name '{deviceName}' not found.");
                     }
+
+                    Debug.WriteLine($"Selected device: {device.FriendlyName}");
+                    Debug.WriteLine($"Device ID: {device.DeviceID}");
+                    Debug.WriteLine($"Device State: {device.DeviceState}");
+                    Debug.WriteLine($"Is Default: {IsDefaultDevice(device)}");
 
                     return device;
                 }
@@ -78,6 +99,23 @@ public sealed class AudioDevice : IAudioDevice
 
             throw new InvalidOperationException("MMDeviceEnumerator is not initialized.");
         }
+    }
+
+    private bool IsDefaultDevice(MMDevice device)
+    {
+        try
+        {
+            if (_mmdeviceEnumerator != null)
+            {
+                var defaultDevice = _mmdeviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
+                return device.DeviceID == defaultDevice.DeviceID;
+            }
+        }
+        catch (CoreAudioAPIException ex)
+        {
+            Debug.WriteLine($"Error checking default device: {ex.Message}");
+        }
+        return false;
     }
 
     private void Dispose(bool disposing)
