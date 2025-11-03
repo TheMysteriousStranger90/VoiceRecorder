@@ -5,7 +5,43 @@
 
 ## Description
 
-VoiceRecorder is an user-friendly application designed to record audio from selected devices. It's perfect for quick recordings and  audio testing.
+VoiceRecorder is a modern application for Windows that provides audio recording capabilities with advanced audio filtering. Built with Avalonia UI and CSCore, it offers an intuitive interface for capturing high-quality audio recordings.
+
+### Core Functionality
+* **Multi-Device Support:** Record from any available audio input device
+* **High-Quality Recording:** WAV format output with configurable audio settings
+* **File Management:** Browse, play, and delete recordings with metadata display
+
+### Audio Filters
+Choose from multiple professional-grade audio filters:
+
+* **Echo:** Add depth and ambiance to recordings
+* **Flanger:** Create sweeping, whooshing effects
+* **Distortion:** Add grit and saturation
+* **Chorus:** Enrich recordings with layered sounds
+* **Compressor:** Balance audio levels dynamically
+* **No Filter:** Pure, unprocessed audio capture
+
+### User Interface
+* **Dual Theme Support:** Switch between Main (purple gradient) and Second themes
+* **Status Bar:** Clear feedback for all operations
+
+### File Explorer
+* **Detailed File Information:** Name, duration, size, date, and location
+* **Quick Actions:** Play, delete, and open files with system default apps
+* **Organized Storage:** Automatic folder structure in `Documents/VoiceRecorder`
+
+---
+
+## System Requirements
+* **Operating System:** Windows 11 (x64)
+* **Runtime:** .NET 9.0
+* **Memory:** 2GB RAM minimum
+* **Storage:** 100MB available space
+* **Audio:** Compatible audio input device (microphone)
+* **Permissions:** Microphone access (configure in Windows Privacy Settings)
+
+---
 
 ## Usage
 
@@ -25,8 +61,7 @@ Bohdan Harabadzhyu
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
-
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 ## SourceForge
 
 [![Download VoiceRecorder](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/voice-recorder-stranger90/files/latest/download)

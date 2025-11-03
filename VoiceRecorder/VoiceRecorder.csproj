@@ -28,7 +28,7 @@
         <Authors>Bohdan Harabadzhyu</Authors>
         <Company>Bohdan Harabadzhyu</Company>
         <Product>Voice Recorder</Product>
-        <Description>A voice recording application with real-time audio visualization and multiple format support.</Description>
+        <Description>A voice recording application with advanced audio filtering.</Description>
         <Copyright>Copyright © 2023 Bohdan Harabadzhyu</Copyright>
 
         <!-- Repository Info -->
