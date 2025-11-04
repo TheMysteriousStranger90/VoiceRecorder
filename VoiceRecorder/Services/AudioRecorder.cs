@@ -13,18 +13,20 @@ namespace VoiceRecorder.Services;
 
 internal sealed class AudioRecorder : IAudioRecorder
 {
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupCaptureResources method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Disposed in CleanupCaptureResources method")]
     private WasapiCapture? _capture;
 
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupResources method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Disposed in CleanupResources method")]
     private WaveWriter? _writer;
 
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupCaptureResources method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Disposed in CleanupCaptureResources method")]
     private SoundInSource? _soundInSource;
 
     private IWaveSource? _filteredSource;
     private bool _disposed;
-    private bool _isFirstDataReceived;
 
     public IWaveSource? CaptureSource => _soundInSource;
 
@@ -44,8 +46,6 @@ internal sealed class AudioRecorder : IAudioRecorder
 
         try
         {
-            _isFirstDataReceived = false;
-
             _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
             _capture.Device = device;
             _capture.Initialize();
@@ -68,12 +68,6 @@ internal sealed class AudioRecorder : IAudioRecorder
                     while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                     {
                         _writer?.Write(buffer, 0, read);
-
-                        if (!_isFirstDataReceived)
-                        {
-                            _isFirstDataReceived = true;
-                            RecordingStarted?.Invoke(this, EventArgs.Empty);
-                        }
                     }
                 }
                 catch (ObjectDisposedException ex)
@@ -91,6 +85,8 @@ internal sealed class AudioRecorder : IAudioRecorder
             };
 
             _capture.Start();
+
+            RecordingStarted?.Invoke(this, EventArgs.Empty);
         }
         catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
         {
