@@ -14,141 +14,134 @@ internal sealed class AudioRecorder : IAudioRecorder
 {
     private WasapiCapture? _capture;
     private WaveWriter? _writer;
-    private bool _disposed;
     private SoundInSource? _soundInSource;
-    private readonly object _lock = new();
-    private bool _isRecording;
+    private IWaveSource? _filteredSource;
+    private bool _disposed;
 
-    public IWaveSource? CaptureSource
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _soundInSource;
-            }
-        }
-    }
+    public IWaveSource? CaptureSource => _soundInSource;
 
     public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter? filter)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputFilePath);
         ArgumentNullException.ThrowIfNull(device);
 
-        lock (_lock)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_capture != null)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            throw new InvalidOperationException("Recording is already in progress.");
+        }
 
-            if (_isRecording)
+        try
+        {
+            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
+            _capture.Device = device;
+            _capture.Initialize();
+
+            _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
+
+            _filteredSource = filter != null
+                ? filter.ApplyFilter(_soundInSource)
+                : _soundInSource;
+
+            _writer = new WaveWriter(outputFilePath, _filteredSource.WaveFormat);
+
+            byte[] buffer = new byte[_filteredSource.WaveFormat.BytesPerSecond / 2];
+
+            _capture.DataAvailable += (s, e) =>
             {
-                throw new InvalidOperationException("Recording is already in progress.");
-            }
-
-            try
-            {
-                _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
-                _capture.Device = device;
-                _capture.Initialize();
-
-                _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
-
-                IWaveSource filteredSource;
-                if (filter != null)
-                {
-                    filteredSource = filter.ApplyFilter(_soundInSource);
-                }
-                else
-                {
-                    filteredSource = _soundInSource;
-                }
-
-                _writer = new WaveWriter(outputFilePath, filteredSource.WaveFormat);
-
-                byte[] buffer = new byte[filteredSource.WaveFormat.BytesPerSecond / 2];
-
-                _capture.DataAvailable += (s, e) =>
+                try
                 {
                     int read;
-                    while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
+                    while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        _writer.Write(buffer, 0, read);
+                        _writer?.Write(buffer, 0, read);
                     }
-                };
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    Debug.WriteLine($"Object disposed in DataAvailable: {ex.Message}");
+                }
+                catch (IOException ex)
+                {
+                    Debug.WriteLine($"IO error in DataAvailable: {ex.Message}");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Debug.WriteLine($"Invalid operation in DataAvailable: {ex.Message}");
+                }
+            };
 
-                _capture.Start();
-                _isRecording = true;
-            }
-            catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
-            {
-                CleanupResources();
-                throw new UnauthorizedAccessException(
-                    "Microphone access is denied. Please check your privacy settings.", ex);
-            }
-            catch (CoreAudioAPIException coreEx)
-            {
-                CleanupResources();
-                throw new AudioRecorderException("Failed to initialize audio capture device", coreEx);
-            }
-            catch (IOException ioEx)
-            {
-                CleanupResources();
-                throw new AudioRecorderException($"Failed to create output file: {outputFilePath}", ioEx);
-            }
-            catch (UnauthorizedAccessException uaEx)
-            {
-                CleanupResources();
-                throw new AudioRecorderException("Access denied to output file or microphone", uaEx);
-            }
-            catch (ArgumentException argEx)
-            {
-                CleanupResources();
-                throw new AudioRecorderException("Invalid argument provided", argEx);
-            }
-            catch (InvalidOperationException invEx)
-            {
-                CleanupResources();
-                throw new AudioRecorderException("Invalid operation during recording initialization", invEx);
-            }
+            _capture.Start();
+        }
+        catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
+        {
+            CleanupResources();
+            throw new UnauthorizedAccessException(
+                "Microphone access is denied. Please check your privacy settings.", ex);
+        }
+        catch (CoreAudioAPIException ex)
+        {
+            CleanupResources();
+            throw new AudioRecorderException("Failed to initialize audio capture device", ex);
+        }
+        catch (IOException ex)
+        {
+            CleanupResources();
+            throw new AudioRecorderException($"Failed to create output file: {outputFilePath}", ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            CleanupResources();
+            throw new AudioRecorderException("Access denied to output file or microphone", ex);
+        }
+        catch (ArgumentException ex)
+        {
+            CleanupResources();
+            throw new AudioRecorderException("Invalid argument provided", ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            CleanupResources();
+            throw new AudioRecorderException("Invalid operation during recording initialization", ex);
         }
     }
 
     public void StopRecording()
     {
-        lock (_lock)
+        if (_capture == null)
         {
-            if (!_isRecording)
-            {
-                return;
-            }
+            return;
+        }
 
-            _isRecording = false;
+        try
+        {
+            _capture.Stop();
+        }
+        catch (CoreAudioAPIException ex)
+        {
+            Debug.WriteLine($"Audio API error stopping capture: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Debug.WriteLine($"Invalid operation stopping capture: {ex.Message}");
+        }
 
-            if (_capture != null)
-            {
-                try
-                {
-                    _capture.Stop();
-                }
-                catch (CoreAudioAPIException ex)
-                {
-                    Debug.WriteLine($"Error stopping capture: {ex.Message}");
-                    throw new AudioRecorderException("Failed to stop capture", ex);
-                }
-            }
-
-            if (_writer != null)
-            {
-                try
-                {
-                    _writer.Dispose();
-                    _writer = null;
-                }
-                catch (IOException ex)
-                {
-                    Debug.WriteLine($"Error disposing writer: {ex.Message}");
-                    throw new AudioRecorderException("Failed to finalize recording", ex);
-                }
-            }
+        try
+        {
+            _writer?.Dispose();
+        }
+        catch (IOException ex)
+        {
+            Debug.WriteLine($"IO error disposing writer: {ex.Message}");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Debug.WriteLine($"Writer already disposed: {ex.Message}");
+        }
+        finally
+        {
+            _writer = null;
         }
     }
 
@@ -156,71 +149,106 @@ internal sealed class AudioRecorder : IAudioRecorder
     {
         ArgumentNullException.ThrowIfNull(newSource);
 
-        lock (_lock)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_capture != null)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            _capture?.Stop();
-
-            _soundInSource = newSource as SoundInSource;
-
-            if (_soundInSource != null && _isRecording)
+            try
             {
-                _capture?.Start();
+                _capture.Stop();
             }
-            else if (_soundInSource == null)
+            catch (CoreAudioAPIException ex)
             {
-                Debug.WriteLine("newSource is not a SoundInSource");
+                Debug.WriteLine($"Audio API error stopping capture: {ex.Message}");
             }
+            catch (InvalidOperationException ex)
+            {
+                Debug.WriteLine($"Invalid operation stopping capture: {ex.Message}");
+            }
+        }
+
+        _soundInSource = newSource as SoundInSource;
+
+        if (_soundInSource != null && _capture != null)
+        {
+            try
+            {
+                _capture.Start();
+            }
+            catch (CoreAudioAPIException ex)
+            {
+                Debug.WriteLine($"Audio API error restarting capture: {ex.Message}");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.WriteLine($"Invalid operation restarting capture: {ex.Message}");
+            }
+        }
+        else if (_soundInSource == null)
+        {
+            Debug.WriteLine("newSource is not a SoundInSource");
         }
     }
 
     private void CleanupResources()
     {
-        try
+        if (_capture != null)
         {
-            _soundInSource?.Dispose();
-        }
-        catch (ObjectDisposedException odEx)
-        {
-            Debug.WriteLine($"SoundInSource already disposed: {odEx.Message}");
-        }
-        finally
-        {
-            _soundInSource = null;
-        }
-
-        try
-        {
-            _capture?.Dispose();
-        }
-        catch (ObjectDisposedException odEx)
-        {
-            Debug.WriteLine($"Capture already disposed: {odEx.Message}");
-        }
-        finally
-        {
-            _capture = null;
+            try
+            {
+                _capture.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Capture already disposed: {ex.Message}");
+            }
+            catch (CoreAudioAPIException ex)
+            {
+                Debug.WriteLine($"Audio API error disposing capture: {ex.Message}");
+            }
+            finally
+            {
+                _capture = null;
+            }
         }
 
-        try
+        if (_soundInSource != null)
         {
-            _writer?.Dispose();
-        }
-        catch (ObjectDisposedException odEx)
-        {
-            Debug.WriteLine($"Writer already disposed: {odEx.Message}");
-        }
-        catch (IOException ioEx)
-        {
-            Debug.WriteLine($"Error disposing writer: {ioEx.Message}");
-        }
-        finally
-        {
-            _writer = null;
+            try
+            {
+                _soundInSource.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
+            }
+            finally
+            {
+                _soundInSource = null;
+            }
         }
 
-        _isRecording = false;
+        if (_writer != null)
+        {
+            try
+            {
+                _writer.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Writer already disposed: {ex.Message}");
+            }
+            catch (IOException ex)
+            {
+                Debug.WriteLine($"IO error disposing writer: {ex.Message}");
+            }
+            finally
+            {
+                _writer = null;
+            }
+        }
+
+        _filteredSource = null;
     }
 
     private void Dispose(bool disposing)
@@ -229,26 +257,8 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             if (disposing)
             {
-                lock (_lock)
-                {
-                    if (_isRecording)
-                    {
-                        try
-                        {
-                            StopRecording();
-                        }
-                        catch (AudioRecorderException arEx)
-                        {
-                            Debug.WriteLine($"Error stopping recording during dispose: {arEx.Message}");
-                        }
-                        catch (CoreAudioAPIException coreEx)
-                        {
-                            Debug.WriteLine($"Audio API error during dispose: {coreEx.Message}");
-                        }
-                    }
-
-                    CleanupResources();
-                }
+                StopRecording();
+                CleanupResources();
             }
 
             _disposed = true;
