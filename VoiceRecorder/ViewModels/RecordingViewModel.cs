@@ -193,7 +193,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            _stopwatch.Restart();
+            _stopwatch.Reset();
             TimerText = "00:00:00";
 
             string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice);
@@ -206,12 +206,13 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
             var device = _device.SelectDevice(SelectedDevice);
 
+            _recorder.RecordingStarted += OnRecordingStarted;
+
             _recorder.StartRecording(
                 filePath,
                 device,
                 SelectedFilterViewModel?.FilterStrategy);
 
-            _timer.Start();
             IsRecording = true;
 
             string filterName = SelectedFilterViewModel?.ToString() ?? "No filter";
@@ -249,6 +250,17 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             _timer.Stop();
             _stopwatch.Reset();
         }
+    }
+
+    private void OnRecordingStarted(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _stopwatch.Start();
+            _timer.Start();
+        });
+
+        _recorder.RecordingStarted -= OnRecordingStarted;
     }
 
     private void StopRecording()

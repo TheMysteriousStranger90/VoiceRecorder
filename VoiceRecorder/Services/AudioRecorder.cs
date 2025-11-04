@@ -17,8 +17,11 @@ internal sealed class AudioRecorder : IAudioRecorder
     private SoundInSource? _soundInSource;
     private IWaveSource? _filteredSource;
     private bool _disposed;
+    private bool _isFirstDataReceived;
 
     public IWaveSource? CaptureSource => _soundInSource;
+
+    public event EventHandler? RecordingStarted;
 
     public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter? filter)
     {
@@ -34,6 +37,8 @@ internal sealed class AudioRecorder : IAudioRecorder
 
         try
         {
+            _isFirstDataReceived = false;
+
             _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
             _capture.Device = device;
             _capture.Initialize();
@@ -56,6 +61,12 @@ internal sealed class AudioRecorder : IAudioRecorder
                     while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                     {
                         _writer?.Write(buffer, 0, read);
+
+                        if (!_isFirstDataReceived)
+                        {
+                            _isFirstDataReceived = true;
+                            RecordingStarted?.Invoke(this, EventArgs.Empty);
+                        }
                     }
                 }
                 catch (ObjectDisposedException ex)
@@ -117,6 +128,7 @@ internal sealed class AudioRecorder : IAudioRecorder
         try
         {
             _capture.Stop();
+            System.Threading.Thread.Sleep(100);
         }
         catch (CoreAudioAPIException ex)
         {
@@ -147,7 +159,7 @@ internal sealed class AudioRecorder : IAudioRecorder
             _writer = null;
         }
 
-        System.Threading.Thread.Sleep(200);
+        System.Threading.Thread.Sleep(150);
     }
 
     public void UpdateSource(IWaveSource newSource)
