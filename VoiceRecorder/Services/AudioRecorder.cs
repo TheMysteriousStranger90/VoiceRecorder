@@ -46,17 +46,21 @@ internal sealed class AudioRecorder : IAudioRecorder
 
             try
             {
-                _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100)
-                {
-                    Device = device
-                };
+                _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
+                _capture.Device = device;
                 _capture.Initialize();
 
                 _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
 
-                IWaveSource filteredSource = filter != null
-                    ? filter.ApplyFilter(_soundInSource)
-                    : _soundInSource;
+                IWaveSource filteredSource;
+                if (filter != null)
+                {
+                    filteredSource = filter.ApplyFilter(_soundInSource);
+                }
+                else
+                {
+                    filteredSource = _soundInSource;
+                }
 
                 _writer = new WaveWriter(outputFilePath, filteredSource.WaveFormat);
 
@@ -64,26 +68,10 @@ internal sealed class AudioRecorder : IAudioRecorder
 
                 _capture.DataAvailable += (s, e) =>
                 {
-                    try
+                    int read;
+                    while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        int read;
-                        lock (_lock)
-                        {
-                            if (_writer == null || !_isRecording) return;
-
-                            while ((read = filteredSource.Read(buffer, 0, buffer.Length)) > 0)
-                            {
-                                _writer.Write(buffer, 0, read);
-                            }
-                        }
-                    }
-                    catch (IOException ioEx)
-                    {
-                        Debug.WriteLine($"I/O error writing audio data: {ioEx.Message}");
-                    }
-                    catch (ObjectDisposedException odEx)
-                    {
-                        Debug.WriteLine($"Object disposed while writing audio data: {odEx.Message}");
+                        _writer.Write(buffer, 0, read);
                     }
                 };
 
@@ -110,6 +98,16 @@ internal sealed class AudioRecorder : IAudioRecorder
             {
                 CleanupResources();
                 throw new AudioRecorderException("Access denied to output file or microphone", uaEx);
+            }
+            catch (ArgumentException argEx)
+            {
+                CleanupResources();
+                throw new AudioRecorderException("Invalid argument provided", argEx);
+            }
+            catch (InvalidOperationException invEx)
+            {
+                CleanupResources();
+                throw new AudioRecorderException("Invalid operation during recording initialization", invEx);
             }
         }
     }
