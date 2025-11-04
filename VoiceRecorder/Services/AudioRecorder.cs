@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
@@ -12,9 +13,15 @@ namespace VoiceRecorder.Services;
 
 internal sealed class AudioRecorder : IAudioRecorder
 {
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupCaptureResources method")]
     private WasapiCapture? _capture;
+
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupResources method")]
     private WaveWriter? _writer;
+
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Disposed in CleanupCaptureResources method")]
     private SoundInSource? _soundInSource;
+
     private IWaveSource? _filteredSource;
     private bool _disposed;
     private bool _isFirstDataReceived;
@@ -128,7 +135,6 @@ internal sealed class AudioRecorder : IAudioRecorder
         try
         {
             _capture.Stop();
-            System.Threading.Thread.Sleep(100);
         }
         catch (CoreAudioAPIException ex)
         {
@@ -159,7 +165,73 @@ internal sealed class AudioRecorder : IAudioRecorder
             _writer = null;
         }
 
-        System.Threading.Thread.Sleep(150);
+        CleanupCaptureResources();
+    }
+
+    private void CleanupCaptureResources()
+    {
+        if (_capture != null)
+        {
+            try
+            {
+                _capture.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Capture already disposed: {ex.Message}");
+            }
+            catch (CoreAudioAPIException ex)
+            {
+                Debug.WriteLine($"Audio API error disposing capture: {ex.Message}");
+            }
+            finally
+            {
+                _capture = null;
+            }
+        }
+
+        if (_soundInSource != null)
+        {
+            try
+            {
+                _soundInSource.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
+            }
+            finally
+            {
+                _soundInSource = null;
+            }
+        }
+
+        _filteredSource = null;
+    }
+
+    private void CleanupResources()
+    {
+        CleanupCaptureResources();
+
+        if (_writer != null)
+        {
+            try
+            {
+                _writer.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Writer already disposed: {ex.Message}");
+            }
+            catch (IOException ex)
+            {
+                Debug.WriteLine($"IO error disposing writer: {ex.Message}");
+            }
+            finally
+            {
+                _writer = null;
+            }
+        }
     }
 
     public void UpdateSource(IWaveSource newSource)
@@ -205,74 +277,6 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             Debug.WriteLine("newSource is not a SoundInSource");
         }
-    }
-
-    private void CleanupResources()
-    {
-        if (_capture != null)
-        {
-            try
-            {
-                if (_capture.RecordingState == RecordingState.Recording)
-                {
-                    _capture.Stop();
-                }
-
-                _capture.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Capture already disposed: {ex.Message}");
-            }
-            catch (CoreAudioAPIException ex)
-            {
-                Debug.WriteLine($"Audio API error disposing capture: {ex.Message}");
-            }
-            finally
-            {
-                _capture = null;
-            }
-        }
-
-        if (_writer != null)
-        {
-            try
-            {
-                _writer.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Writer already disposed: {ex.Message}");
-            }
-            catch (IOException ex)
-            {
-                Debug.WriteLine($"IO error disposing writer: {ex.Message}");
-            }
-            finally
-            {
-                _writer = null;
-            }
-        }
-
-        if (_soundInSource != null)
-        {
-            try
-            {
-                _soundInSource.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
-            }
-            finally
-            {
-                _soundInSource = null;
-            }
-        }
-
-        _filteredSource = null;
-
-        System.Threading.Thread.Sleep(150);
     }
 
     private void Dispose(bool disposing)
