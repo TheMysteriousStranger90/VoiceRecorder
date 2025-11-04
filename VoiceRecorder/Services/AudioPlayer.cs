@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using CSCore;
 using CSCore.Codecs;
 using CSCore.SoundOut;
@@ -11,7 +12,11 @@ namespace VoiceRecorder.Services;
 internal sealed class AudioPlayer : IAudioPlayer
 {
     private IWaveSource? _waveSource;
-    private WasapiOut? _soundOut;
+
+    [SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance",
+        Justification = "ISoundOut provides flexibility for different sound output implementations")]
+    private ISoundOut? _soundOut;
+
     private bool _disposed;
     private float _volume = 1.0f;
     private PlaybackState _playbackState = PlaybackState.Stopped;
