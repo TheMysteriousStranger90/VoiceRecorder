@@ -2,7 +2,6 @@
 using CSCore;
 using CSCore.Codecs;
 using CSCore.SoundOut;
-using VoiceRecorder.Exceptions;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
 using PlaybackState = VoiceRecorder.Models.PlaybackState;
@@ -17,40 +16,21 @@ internal sealed class AudioPlayer : IAudioPlayer
     private float _volume = 1.0f;
     private PlaybackState _playbackState = PlaybackState.Stopped;
     private string? _currentFilePath;
-    private readonly object _lock = new();
 
     public float Volume
     {
-        get
-        {
-            lock (_lock)
-            {
-                return _volume;
-            }
-        }
+        get => _volume;
         set
         {
-            lock (_lock)
+            _volume = Math.Clamp(value, 0f, 1f);
+            if (_soundOut != null)
             {
-                _volume = Math.Clamp(value, 0f, 1f);
-                if (_soundOut != null)
-                {
-                    _soundOut.Volume = _volume;
-                }
+                _soundOut.Volume = _volume;
             }
         }
     }
 
-    public PlaybackState CurrentPlaybackState
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _playbackState;
-            }
-        }
-    }
+    public PlaybackState CurrentPlaybackState => _playbackState;
 
     public event EventHandler<PlaybackStatusEventArgs>? PlaybackStatusChanged;
 
@@ -58,104 +38,96 @@ internal sealed class AudioPlayer : IAudioPlayer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
-        if (!File.Exists(filePath))
+        StopFile();
+
+        try
         {
-            RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
-                "File not found",
-                Path.GetFileName(filePath)));
-            return;
+            _currentFilePath = filePath;
+            _waveSource = CodecFactory.Instance.GetCodec(_currentFilePath);
+            _soundOut = new WasapiOut();
+            _soundOut.Stopped += OnPlaybackStopped;
+            _soundOut.Initialize(_waveSource);
+            _soundOut.Volume = _volume;
+            _soundOut.Play();
+            _playbackState = PlaybackState.Playing;
+
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                PlaybackState.Playing,
+                Path.GetFileName(_currentFilePath)));
         }
-
-        lock (_lock)
+        catch (IOException ex)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            StopFile();
-
-            try
-            {
-                _currentFilePath = filePath;
-                _waveSource = CodecFactory.Instance.GetCodec(_currentFilePath);
-                _soundOut = new WasapiOut();
-                _soundOut.Stopped += OnPlaybackStopped;
-                _soundOut.Initialize(_waveSource);
-                _soundOut.Volume = _volume;
-                _soundOut.Play();
-                _playbackState = PlaybackState.Playing;
-
-                RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
-                    PlaybackState.Playing,
-                    Path.GetFileName(_currentFilePath)));
-            }
-            catch (UnsupportedCodecException ex)
-            {
-                Debug.WriteLine($"Playback error: {ex.Message}");
-                _currentFilePath = null;
-                _playbackState = PlaybackState.Stopped;
-                RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
-                    ex.Message,
-                    Path.GetFileName(filePath)));
-            }
+            Debug.WriteLine($"IO error during playback: {ex.Message}");
+            _currentFilePath = null;
+            _playbackState = PlaybackState.Stopped;
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                $"File access error: {ex.Message}",
+                Path.GetFileName(filePath)));
+        }
+        catch (NotSupportedException ex)
+        {
+            Debug.WriteLine($"Unsupported format: {ex.Message}");
+            _currentFilePath = null;
+            _playbackState = PlaybackState.Stopped;
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                $"Unsupported audio format: {ex.Message}",
+                Path.GetFileName(filePath)));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Debug.WriteLine($"Access denied: {ex.Message}");
+            _currentFilePath = null;
+            _playbackState = PlaybackState.Stopped;
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                $"Access denied: {ex.Message}",
+                Path.GetFileName(filePath)));
         }
     }
 
     public void PausePlayback()
     {
-        lock (_lock)
+        if (_soundOut != null && _playbackState == PlaybackState.Playing)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            if (_soundOut != null && _playbackState == PlaybackState.Playing)
+            try
             {
-                try
-                {
-                    _soundOut.Pause();
-                    _playbackState = PlaybackState.Paused;
-                    RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
-                        PlaybackState.Paused,
-                        Path.GetFileName(_currentFilePath ?? string.Empty)));
-                }
-                catch (InvalidOperationException ex)
-                {
-                    Debug.WriteLine($"Error pausing playback: {ex.Message}");
-                }
+                _soundOut.Pause();
+                _playbackState = PlaybackState.Paused;
+                PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                    PlaybackState.Paused,
+                    Path.GetFileName(_currentFilePath ?? string.Empty)));
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.WriteLine($"Error pausing playback: {ex.Message}");
             }
         }
     }
 
     public void ResumePlayback()
     {
-        lock (_lock)
+        if (_soundOut != null && _playbackState == PlaybackState.Paused)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            if (_soundOut != null && _playbackState == PlaybackState.Paused)
+            try
             {
-                try
-                {
-                    _soundOut.Play();
-                    _playbackState = PlaybackState.Playing;
-                    RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
-                        PlaybackState.Playing,
-                        Path.GetFileName(_currentFilePath ?? string.Empty)));
-                }
-                catch (InvalidOperationException ex)
-                {
-                    Debug.WriteLine($"Error resuming playback: {ex.Message}");
-                }
+                _soundOut.Play();
+                _playbackState = PlaybackState.Playing;
+                PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
+                    PlaybackState.Playing,
+                    Path.GetFileName(_currentFilePath ?? string.Empty)));
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.WriteLine($"Error resuming playback: {ex.Message}");
             }
         }
     }
 
     private void OnPlaybackStopped(object? sender, EventArgs e)
     {
-        lock (_lock)
+        if (_playbackState != PlaybackState.Stopped)
         {
-            if (_playbackState != PlaybackState.Stopped)
-            {
-                string? lastFile = _currentFilePath != null ? Path.GetFileName(_currentFilePath) : null;
-                StopInternal(lastFile);
-            }
+            string? lastFile = _currentFilePath != null ? Path.GetFileName(_currentFilePath) : null;
+            StopInternal(lastFile);
         }
     }
 
@@ -164,15 +136,7 @@ internal sealed class AudioPlayer : IAudioPlayer
         if (_soundOut != null)
         {
             _soundOut.Stopped -= OnPlaybackStopped;
-            try
-            {
-                _soundOut.Stop();
-            }
-            catch (InvalidOperationException ex)
-            {
-                Debug.WriteLine($"Error stopping sound: {ex.Message}");
-            }
-
+            _soundOut.Stop();
             _soundOut.Dispose();
             _soundOut = null;
         }
@@ -190,7 +154,7 @@ internal sealed class AudioPlayer : IAudioPlayer
         if (_playbackState != PlaybackState.Stopped)
         {
             _playbackState = PlaybackState.Stopped;
-            RaisePlaybackStatusChanged(new PlaybackStatusEventArgs(
+            PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
                 PlaybackState.Stopped,
                 fileForEvent ?? string.Empty));
         }
@@ -198,40 +162,19 @@ internal sealed class AudioPlayer : IAudioPlayer
 
     public void StopFile()
     {
-        lock (_lock)
+        if (_playbackState == PlaybackState.Stopped && _soundOut == null && _waveSource == null)
         {
-            if (_playbackState == PlaybackState.Stopped && _soundOut == null && _waveSource == null)
-            {
-                return;
-            }
-
-            StopInternal();
+            return;
         }
-    }
 
-    private void RaisePlaybackStatusChanged(PlaybackStatusEventArgs args)
-    {
-        PlaybackStatusChanged?.Invoke(this, args);
+        StopInternal();
     }
 
     public void Dispose()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    private void Dispose(bool disposing)
-    {
         if (!_disposed)
         {
-            if (disposing)
-            {
-                lock (_lock)
-                {
-                    StopFile();
-                }
-            }
-
+            StopFile();
             _disposed = true;
         }
     }

@@ -129,7 +129,10 @@ internal sealed class AudioRecorder : IAudioRecorder
 
         try
         {
-            _writer?.Dispose();
+            if (_writer != null)
+            {
+                _writer.Dispose();
+            }
         }
         catch (IOException ex)
         {
@@ -143,6 +146,8 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             _writer = null;
         }
+
+        System.Threading.Thread.Sleep(200);
     }
 
     public void UpdateSource(IWaveSource newSource)
@@ -196,6 +201,11 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             try
             {
+                if (_capture.RecordingState == RecordingState.Recording)
+                {
+                    _capture.Stop();
+                }
+
                 _capture.Dispose();
             }
             catch (ObjectDisposedException ex)
@@ -209,22 +219,6 @@ internal sealed class AudioRecorder : IAudioRecorder
             finally
             {
                 _capture = null;
-            }
-        }
-
-        if (_soundInSource != null)
-        {
-            try
-            {
-                _soundInSource.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
-            }
-            finally
-            {
-                _soundInSource = null;
             }
         }
 
@@ -248,7 +242,25 @@ internal sealed class AudioRecorder : IAudioRecorder
             }
         }
 
+        if (_soundInSource != null)
+        {
+            try
+            {
+                _soundInSource.Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
+            }
+            finally
+            {
+                _soundInSource = null;
+            }
+        }
+
         _filteredSource = null;
+
+        System.Threading.Thread.Sleep(150);
     }
 
     private void Dispose(bool disposing)
