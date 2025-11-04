@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
@@ -14,6 +15,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Closing += OnWindowClosing;
 
         _themeService = App.ServiceProvider?.GetRequiredService<IThemeService>()
                         ?? new VoiceRecorder.Services.ThemeService();
@@ -45,6 +47,14 @@ public partial class MainWindow : Window
             {
                 Source = new Uri("avares://VoiceRecorder/Styles/SecondTheme.axaml")
             });
+        }
+    }
+
+    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.OnWindowClosing();
         }
     }
 

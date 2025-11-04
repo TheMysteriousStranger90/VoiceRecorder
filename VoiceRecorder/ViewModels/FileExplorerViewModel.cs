@@ -343,6 +343,15 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         });
     }
 
+    public void StopPlayback()
+    {
+        if (_player.CurrentPlaybackState == PlaybackState.Playing ||
+            _player.CurrentPlaybackState == PlaybackState.Paused)
+        {
+            _player.StopFile();
+        }
+    }
+
     private void PlayFile(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
