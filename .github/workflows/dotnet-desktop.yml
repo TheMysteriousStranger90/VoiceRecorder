@@ -37,17 +37,18 @@ jobs:
             - name: Restore dependencies
               run: dotnet restore ${{ env.SOLUTION_NAME }}
 
+            - name: Fix code formatting
+              run: dotnet format ${{ env.SOLUTION_NAME }} --verbosity diagnostic
+
             - name: Check code formatting
               run: dotnet format ${{ env.SOLUTION_NAME }} --verify-no-changes --verbosity diagnostic
-              continue-on-error: true
 
             - name: Run Code Analysis
               run: |
                   dotnet build ${{ env.SOLUTION_NAME }} `
                     --configuration Release `
                     --no-restore `
-                    /p:TreatWarningsAsErrors=false `
-                    /p:WarningsNotAsErrors="CA1416;CA1515;CA1812;NU1701"
+                    /p:TreatWarningsAsErrors=true
 
     # ============================================
     # Job 2: Build & Test
