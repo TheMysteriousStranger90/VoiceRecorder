@@ -66,7 +66,6 @@
 
         <!-- Warning Configuration -->
         <WarningsNotAsErrors>CA1416;CA1515;CA1812;NU1701</WarningsNotAsErrors>
-        <NoWarn>$(NoWarn);NU1701;CA1515</NoWarn>
 
         <!-- Language Features -->
         <LangVersion>latest</LangVersion>
