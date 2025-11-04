@@ -47,7 +47,7 @@ jobs:
                     --configuration Release `
                     --no-restore `
                     /p:TreatWarningsAsErrors=false `
-                    /p:WarningsNotAsErrors=CA1416;CA1515;CA1812;NU1701
+                    /p:WarningsNotAsErrors="CA1416;CA1515;CA1812;NU1701"
 
     # ============================================
     # Job 2: Build & Test
