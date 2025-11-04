@@ -20,7 +20,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private readonly IAudioRecorder _recorder;
     private readonly IAudioDevice _device;
     private readonly DispatcherTimer _timer;
-    private TimeSpan _time;
+    private readonly Stopwatch _stopwatch = new();
     private string _timerText = "00:00:00";
     private bool _isRecording;
     private VoiceFilterViewModel _selectedFilterViewModel;
@@ -162,8 +162,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
     private void Timer_Tick(object? sender, EventArgs e)
     {
-        _time = _time.Add(TimeSpan.FromSeconds(1));
-        TimerText = _time.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+        TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
     }
 
     private void StartRecording()
@@ -188,7 +187,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            _time = TimeSpan.Zero;
+            _stopwatch.Restart();
             TimerText = "00:00:00";
 
             string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice);
@@ -218,6 +217,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             Debug.WriteLine($"Microphone access denied: {ex.Message}");
             IsRecording = false;
             _timer.Stop();
+            _stopwatch.Reset();
         }
         catch (AudioRecorderException ex)
         {
@@ -225,6 +225,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             Debug.WriteLine($"Recording error: {ex.Message}");
             IsRecording = false;
             _timer.Stop();
+            _stopwatch.Reset();
         }
         catch (InvalidOperationException ex)
         {
@@ -232,6 +233,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             Debug.WriteLine($"Invalid operation: {ex.Message}");
             IsRecording = false;
             _timer.Stop();
+            _stopwatch.Reset();
         }
         catch (IOException ioEx)
         {
@@ -239,6 +241,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             Debug.WriteLine($"I/O error: {ioEx.Message}");
             IsRecording = false;
             _timer.Stop();
+            _stopwatch.Reset();
         }
     }
 
@@ -252,6 +255,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         try
         {
             _recorder.StopRecording();
+            _stopwatch.Stop();
             _timer.Stop();
             IsRecording = false;
             UpdateStatus($"Recording saved - Duration: {TimerText}");
@@ -262,6 +266,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             Debug.WriteLine($"Error stopping recording: {ex.Message}");
             IsRecording = false;
             _timer.Stop();
+            _stopwatch.Reset();
         }
     }
 
