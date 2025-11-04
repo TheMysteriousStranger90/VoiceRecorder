@@ -14,15 +14,15 @@ namespace VoiceRecorder.Services;
 internal sealed class AudioRecorder : IAudioRecorder
 {
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in CleanupCaptureResources method")]
+        Justification = "Disposed in Dispose method")]
     private WasapiCapture? _capture;
 
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in CleanupResources method")]
+        Justification = "Disposed in Dispose method")]
     private WaveWriter? _writer;
 
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in CleanupCaptureResources method")]
+        Justification = "Disposed in Dispose method")]
     private SoundInSource? _soundInSource;
 
     private IWaveSource? _filteredSource;
@@ -34,16 +34,6 @@ internal sealed class AudioRecorder : IAudioRecorder
 
     public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter? filter)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(outputFilePath);
-        ArgumentNullException.ThrowIfNull(device);
-
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (_capture != null)
-        {
-            throw new InvalidOperationException("Recording is already in progress.");
-        }
-
         try
         {
             _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
@@ -146,6 +136,7 @@ internal sealed class AudioRecorder : IAudioRecorder
             if (_writer != null)
             {
                 _writer.Dispose();
+                _writer = null;
             }
         }
         catch (IOException ex)
@@ -156,15 +147,9 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             Debug.WriteLine($"Writer already disposed: {ex.Message}");
         }
-        finally
-        {
-            _writer = null;
-        }
-
-        CleanupCaptureResources();
     }
 
-    private void CleanupCaptureResources()
+    private void CleanupResources()
     {
         if (_capture != null)
         {
@@ -202,13 +187,6 @@ internal sealed class AudioRecorder : IAudioRecorder
             }
         }
 
-        _filteredSource = null;
-    }
-
-    private void CleanupResources()
-    {
-        CleanupCaptureResources();
-
         if (_writer != null)
         {
             try
@@ -228,6 +206,8 @@ internal sealed class AudioRecorder : IAudioRecorder
                 _writer = null;
             }
         }
+
+        _filteredSource = null;
     }
 
     public void UpdateSource(IWaveSource newSource)
