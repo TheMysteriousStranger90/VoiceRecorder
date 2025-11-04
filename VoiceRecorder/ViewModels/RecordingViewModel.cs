@@ -92,7 +92,13 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             var devices = _device.GetAvailableDevices();
             AvailableDevices = new ObservableCollection<string>(devices);
 
-            if (AvailableDevices.Count > 0)
+            string? defaultDeviceName = _device.GetDefaultDeviceName();
+
+            if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
+            {
+                _selectedDevice = defaultDeviceName;
+            }
+            else if (AvailableDevices.Count > 0)
             {
                 _selectedDevice = AvailableDevices[0];
             }

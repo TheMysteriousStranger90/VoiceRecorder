@@ -55,6 +55,33 @@ internal sealed class AudioDevice : IAudioDevice
         }
     }
 
+    public string? GetDefaultDeviceName()
+    {
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            try
+            {
+                if (_mmdeviceEnumerator != null)
+                {
+                    var defaultDevice = _mmdeviceEnumerator.GetDefaultAudioEndpoint(
+                        DataFlow.Capture,
+                        Role.Console);
+
+                    Debug.WriteLine($"Default device: {defaultDevice.FriendlyName}");
+                    return defaultDevice.FriendlyName;
+                }
+            }
+            catch (CoreAudioAPIException ex)
+            {
+                Debug.WriteLine($"Error getting default device: {ex.Message}");
+            }
+
+            return null;
+        }
+    }
+
     public MMDevice SelectDevice(string deviceName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(deviceName);
@@ -80,6 +107,7 @@ internal sealed class AudioDevice : IAudioDevice
                         {
                             Debug.WriteLine($"  - {d.FriendlyName}");
                         }
+
                         throw new InvalidOperationException($"Device with name '{deviceName}' not found.");
                     }
 
@@ -115,6 +143,7 @@ internal sealed class AudioDevice : IAudioDevice
         {
             Debug.WriteLine($"Error checking default device: {ex.Message}");
         }
+
         return false;
     }
 
