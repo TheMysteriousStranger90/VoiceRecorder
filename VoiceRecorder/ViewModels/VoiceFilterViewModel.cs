@@ -1,25 +1,29 @@
 ﻿using System.ComponentModel;
-using CSCore;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Filters.Interfaces;
-using VoiceRecorder.Models;
+using VoiceRecorder.Interfaces;
 
 namespace VoiceRecorder.ViewModels;
 
-public sealed class VoiceFilterViewModel : INotifyPropertyChanged
+internal sealed class VoiceFilterViewModel : INotifyPropertyChanged
 {
-    public readonly IAudioFilter FilterStrategy;
-    private readonly VoiceFilter _voiceFilter;
+    private readonly IAudioFilter? _filterStrategy;
+    private readonly VoiceFilter? _voiceFilter;
 
-    public VoiceFilterViewModel(AudioRecorder recorder, IAudioFilter filterStrategy)
+    public IAudioFilter? FilterStrategy => _filterStrategy;
+
+    public VoiceFilterViewModel(IAudioRecorder? recorder, IAudioFilter? filterStrategy)
     {
-        this.FilterStrategy = filterStrategy;
-        _voiceFilter = new VoiceFilter(recorder, filterStrategy);
+        _filterStrategy = filterStrategy;
+        if (recorder != null && filterStrategy != null)
+        {
+            _voiceFilter = new VoiceFilter(recorder, filterStrategy);
+        }
     }
 
     public void ApplyFilter()
     {
-        _voiceFilter.ApplyFilter();
+        _voiceFilter?.ApplyFilter();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -31,6 +35,7 @@ public sealed class VoiceFilterViewModel : INotifyPropertyChanged
 
     public override string ToString()
     {
-        return FilterStrategy?.GetType().Name ?? "Without Filters";
+        return _filterStrategy?.GetType().Name.Replace("Filter", string.Empty, StringComparison.Ordinal) ??
+               "Without Filters";
     }
 }

@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using VoiceRecorder.Interfaces;
+using VoiceRecorder.Services;
 using VoiceRecorder.ViewModels;
 using VoiceRecorder.Views;
 
@@ -6,18 +8,29 @@ namespace VoiceRecorder.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    
-    public static void AddCommonViewModels(this IServiceCollection collection)
+    public static IServiceCollection AddViewModels(this IServiceCollection services)
     {
-        collection.AddTransient<MainWindowViewModel>();
-        collection.AddTransient<RecordingViewModel>();
-        collection.AddTransient<FileExplorerViewModel>();
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<RecordingViewModel>();
+        services.AddTransient<FileExplorerViewModel>();
+
+        return services;
     }
-    
-    public static void AddCommonWindows(this IServiceCollection collection)
+
+    public static IServiceCollection AddViews(this IServiceCollection services)
     {
-        collection.AddTransient<MainWindow>();
-        collection.AddTransient<RecordingView>();
-        collection.AddTransient<FileExplorerView>();
+        services.AddSingleton<MainWindow>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddServices(this IServiceCollection services)
+    {
+        services.AddTransient<IAudioDevice, AudioDevice>();
+        services.AddTransient<IAudioRecorder, AudioRecorder>();
+        services.AddTransient<IAudioPlayer, AudioPlayer>();
+
+        services.AddSingleton<IThemeService, ThemeService>();
+        return services;
     }
 }

@@ -4,18 +4,21 @@ using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-public class FlangerFilter : IAudioFilter
+internal sealed class FlangerFilter : IAudioFilter
 {
     public IWaveSource ApplyFilter(IWaveSource source)
     {
-        var flangerEffect = new DmoFlangerEffect(source);
+        ArgumentNullException.ThrowIfNull(source);
 
-        flangerEffect.WetDryMix = 50f;
-        flangerEffect.Depth = 80f;
-        flangerEffect.Feedback = 50f;
-        flangerEffect.Frequency = 0.25f;
-        flangerEffect.Delay = 2f;
-        flangerEffect.Waveform = FlangerWaveform.Sin;
+        var flangerEffect = new DmoFlangerEffect(source)
+        {
+            WetDryMix = 30f,
+            Depth = 50f,
+            Feedback = 30f,
+            Frequency = 0.5f,
+            Delay = 1.5f,
+            Waveform = FlangerWaveform.Sin
+        };
 
         return flangerEffect;
     }

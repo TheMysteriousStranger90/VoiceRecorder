@@ -3,13 +3,14 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using VoiceRecorder.Extensions;
-using VoiceRecorder.ViewModels;
 using VoiceRecorder.Views;
 
 namespace VoiceRecorder;
 
-public partial class App : Application
+internal sealed class App : Application
 {
+    public static IServiceProvider? ServiceProvider { get; private set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -17,18 +18,29 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        var services = new ServiceCollection();
+
+        services.AddViewModels();
+        services.AddViews();
+        services.AddServices();
+
+        ServiceProvider = services.BuildServiceProvider();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = new MainWindowViewModel(),
-            };
+            desktop.MainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+
+            desktop.Exit += OnExit;
         }
-        
-        var collection = new ServiceCollection();
-        collection.AddCommonViewModels();
-        collection.AddCommonWindows();
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void OnExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
+    {
+        if (ServiceProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
     }
 }

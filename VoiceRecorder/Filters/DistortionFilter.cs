@@ -4,15 +4,18 @@ using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-public class DistortionFilter : IAudioFilter
+internal sealed class DistortionFilter : IAudioFilter
 {
     public IWaveSource ApplyFilter(IWaveSource source)
     {
-        var distortionEffect = new DmoDistortionEffect(source);
+        ArgumentNullException.ThrowIfNull(source);
 
-        distortionEffect.Gain = -10;
-        distortionEffect.PostEQCenterFrequency = 200f;
-        distortionEffect.PostEQBandwidth = 1500f;
+        var distortionEffect = new DmoDistortionEffect(source)
+        {
+            Gain = -15,
+            PostEQCenterFrequency = 300f,
+            PostEQBandwidth = 2000f
+        };
 
         return distortionEffect;
     }

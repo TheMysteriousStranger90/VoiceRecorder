@@ -1,22 +1,85 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
+using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
-using VoiceRecorder.Models;
+using Microsoft.Extensions.DependencyInjection;
+using VoiceRecorder.Interfaces;
 using VoiceRecorder.ViewModels;
 
 namespace VoiceRecorder.Views;
 
 public partial class MainWindow : Window
 {
+    private readonly IThemeService _themeService;
+    private bool _isClosing;
+
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel();
+        Closing += OnWindowClosing;
+
+        _themeService = App.ServiceProvider?.GetRequiredService<IThemeService>()
+                        ?? new VoiceRecorder.Services.ThemeService();
+
+        DataContext = new MainWindowViewModel(_themeService);
+
+        _themeService.ThemeChanged += OnThemeChanged;
+        ApplyTheme(_themeService.CurrentTheme);
+    }
+
+    private void OnThemeChanged(object? sender, ThemeChangedEventArgs e)
+    {
+        ApplyTheme(e.Theme);
+    }
+
+    private void ApplyTheme(ThemeVariant theme)
+    {
+        var styles = this.Styles;
+        styles.Clear();
+
+        styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=VoiceRecorder"))
+        {
+            Source = new Uri("avares://VoiceRecorder/Styles/MainTheme.axaml")
+        });
+
+        if (theme == ThemeVariant.Second)
+        {
+            styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=VoiceRecorder"))
+            {
+                Source = new Uri("avares://VoiceRecorder/Styles/SecondTheme.axaml")
+            });
+        }
+    }
+
+    private async void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (_isClosing)
+        {
+            return;
+        }
+
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            e.Cancel = true;
+            _isClosing = true;
+
+            try
+            {
+                await viewModel.OnWindowClosingAsync().ConfigureAwait(true);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    Closing -= OnWindowClosing;
+                    Close();
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error during window closing: {ex.Message}");
+                _isClosing = false;
+            }
+        }
     }
 
     private void InitializeComponent()

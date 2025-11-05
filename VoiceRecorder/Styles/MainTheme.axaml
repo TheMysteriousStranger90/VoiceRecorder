@@ -1,7 +1,7 @@
 ﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:VoiceRecorder.Controls">
-    
+
     <!-- Base Colors -->
     <Style>
         <Style.Resources>
@@ -10,12 +10,12 @@
             <Color x:Key="AccentColor">#F0F</Color>
         </Style.Resources>
     </Style>
-    
-    
+
+
     <Style Selector="controls|AudioVisualizerControl">
         <Setter Property="Template">
             <ControlTemplate>
-                <Border 
+                <Border
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
@@ -164,8 +164,6 @@
         <Setter Property="Width" Value="4"/>
     </Style>
 
-    
-    
     <Style Selector="Label#TimerLabel">
         <Setter Property="FontSize" Value="16"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -196,5 +194,30 @@
                 </Border>
             </ControlTemplate>
         </Setter>
+    </Style>
+
+    <Style Selector="Border.panel">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#214"/>
+                <GradientStop Offset="1" Color="#103"/>
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="BorderBrush" Value="#80F"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+
+    <!-- Navigation Button Style -->
+    <Style Selector="Button.navButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="4"/>
+        <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+
+    <Style Selector="Button.navButton:pointerover">
+        <Setter Property="Background" Value="#80F"/>
     </Style>
 </Styles>

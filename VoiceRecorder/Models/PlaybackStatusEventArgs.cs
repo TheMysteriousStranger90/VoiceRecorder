@@ -1,24 +1,22 @@
-﻿using System;
+﻿namespace VoiceRecorder.Models;
 
-namespace VoiceRecorder.Models;
-
-public class PlaybackStatusEventArgs : EventArgs
+public sealed class PlaybackStatusEventArgs : EventArgs
 {
     public PlaybackState State { get; }
-    public string CurrentFile { get; }
+    public string FileName { get; }
     public string ErrorMessage { get; }
-    
-    public PlaybackStatusEventArgs(PlaybackState state, string currentFile)
+
+    public PlaybackStatusEventArgs(PlaybackState state, string fileName)
     {
         State = state;
-        CurrentFile = currentFile;
-        ErrorMessage = null;
+        FileName = fileName ?? string.Empty;
+        ErrorMessage = string.Empty;
     }
-    
-    public PlaybackStatusEventArgs(string errorMessage, string currentFile = null)
+
+    public PlaybackStatusEventArgs(string errorMessage, string fileName)
     {
         State = PlaybackState.Stopped;
-        CurrentFile = currentFile;
-        ErrorMessage = errorMessage;
+        FileName = fileName ?? string.Empty;
+        ErrorMessage = errorMessage ?? string.Empty;
     }
 }

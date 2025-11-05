@@ -1,33 +1,34 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
+using System.Globalization;
 using System.Reactive;
-using System.Reactive.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
+using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;
 
-public class FileExplorerViewModel : ViewModelBase, IDisposable
+internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
 {
-    private readonly AudioPlayer _player;
-    private string _currentPlayingFile;
+    private readonly IAudioPlayer _player;
+    private string _currentPlayingFile = string.Empty;
     private bool _isPlaying;
     private bool _isActuallyPlaying;
-    private string _playbackStatus;
+    private string _playbackStatus = string.Empty;
+    private float _volume = 1.0f;
+    private bool _disposed;
+    private CancellationTokenSource? _loadCancellationTokenSource;
+    private CancellationTokenSource? _playbackCts;
 
     public bool IsPlaying
     {
         get => _isPlaying;
         private set => this.RaiseAndSetIfChanged(ref _isPlaying, value);
     }
-    
+
     public bool IsActuallyPlaying
     {
         get => _isActuallyPlaying;
@@ -46,8 +47,6 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _playbackStatus, value);
     }
 
-    private float _volume = 1.0f;
-
     public float Volume
     {
         get => _volume;
@@ -58,8 +57,8 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public ObservableCollection<string> Folders { get; } = new ObservableCollection<string>();
-    public ObservableCollection<AudioFileItem> Files { get; } = new ObservableCollection<AudioFileItem>();
+    public ObservableCollection<string> Folders { get; } = [];
+    public ObservableCollection<AudioFileItem> Files { get; } = [];
 
     public ReactiveCommand<AudioFileItem, Unit> OpenFileCommand { get; }
     public ReactiveCommand<AudioFileItem, Unit> PlayFileCommand { get; }
@@ -67,96 +66,166 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> RefreshFilesCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand StopCommand { get; }
-    public event EventHandler<string> StatusChanged;
+
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     private void UpdateStatus(string message)
     {
-        StatusChanged?.Invoke(this, message);
+        StatusChanged?.Invoke(this, new StatusChangedEventArgs(message));
     }
 
-    public FileExplorerViewModel()
+    public FileExplorerViewModel(IAudioPlayer? player = null)
     {
-        _player = new AudioPlayer();
+        _player = player ?? new AudioPlayer();
         _player.PlaybackStatusChanged += OnPlaybackStatusChanged;
 
-        OpenFileCommand = ReactiveCommand.Create<AudioFileItem>(OpenFile);
-        PlayFileCommand = ReactiveCommand.Create<AudioFileItem>(PlayFile);
+        OpenFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(OpenFileAsync);
+        PlayFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(PlayFileAsync);
         DeleteFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(DeleteFileAsync);
-        RefreshFilesCommand = ReactiveCommand.Create(LoadFoldersAndFiles);
-        PlayPauseCommand = ReactiveCommand.Create(PlayPause);
-        StopCommand = ReactiveCommand.Create(Stop);
-        LoadFoldersAndFiles();
+        RefreshFilesCommand = ReactiveCommand.CreateFromTask(LoadFoldersAndFilesAsync);
+        PlayPauseCommand = ReactiveCommand.CreateFromTask(PlayPauseAsync);
+        StopCommand = ReactiveCommand.CreateFromTask(StopAsync);
+
+        Task.Run(async () => await LoadFoldersAndFilesAsync().ConfigureAwait(false));
     }
 
-    public void LoadFoldersAndFiles()
+    public async Task LoadFoldersAndFilesAsync()
     {
-        UpdateStatus("Loading files...");
-        Files.Clear();
-        Folders.Clear();
+        _loadCancellationTokenSource?.CancelAsync();
+        _loadCancellationTokenSource?.Dispose();
+        _loadCancellationTokenSource = new CancellationTokenSource();
 
-        string basePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        var cancellationToken = _loadCancellationTokenSource.Token;
+
+        UpdateStatus("Loading files...");
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            Files.Clear();
+            Folders.Clear();
+        });
+
+        string basePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "VoiceRecorder");
 
         if (!Directory.Exists(basePath))
         {
-            Directory.CreateDirectory(basePath);
-            UpdateStatus("Created VoiceRecorder directory.");
+            try
+            {
+                Directory.CreateDirectory(basePath);
+                UpdateStatus("Created VoiceRecorder directory.");
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Error creating directory: {ex.Message}");
+                Debug.WriteLine($"Error creating directory: {ex.Message}");
+            }
+
             return;
         }
 
-        foreach (var directory in Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories))
+        try
         {
-            Folders.Add(directory.Substring(basePath.Length + 1));
-        }
-
-        Observable.Start(() =>
+            var (directories, loadedFiles) = await Task.Run(() =>
             {
-                var loadedFiles = new List<AudioFileItem>();
-                foreach (var file in Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories))
+                try
                 {
-                    try
+                    if (cancellationToken.IsCancellationRequested)
+                        return (new List<string>(), new List<AudioFileItem>());
+
+                    var dirs = Directory.GetDirectories(basePath, "*", SearchOption.AllDirectories)
+                        .Select(d => Path.GetRelativePath(basePath, d))
+                        .ToList();
+
+                    if (cancellationToken.IsCancellationRequested)
+                        return (dirs, new List<AudioFileItem>());
+
+                    var files = new List<AudioFileItem>();
+                    var wavFiles = Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories);
+
+                    foreach (var file in wavFiles)
                     {
-                        loadedFiles.Add(new AudioFileItem(file, basePath));
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        try
+                        {
+                            files.Add(new AudioFileItem(file, basePath));
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
-                    }
+
+                    return (dirs, files.OrderByDescending(f => f.DateCreated).ToList());
                 }
-                return loadedFiles.OrderBy(f => f.DateCreated).ToList();
-            }, RxApp.TaskpoolScheduler)
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(loadedFiles =>
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error in LoadFoldersAndFiles: {ex.Message}");
+                    return (new List<string>(), new List<AudioFileItem>());
+                }
+            }, cancellationToken).ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                foreach (var directory in directories)
+                {
+                    Folders.Add(directory);
+                }
+
                 foreach (var fileItem in loadedFiles)
                 {
                     Files.Add(fileItem);
                 }
 
-                UpdateStatus(Files.Any() ? "Files loaded." : "No audio files found.");
-            }, ex =>
-            {
-                UpdateStatus($"Error loading files: {ex.Message}");
-                Debug.WriteLine($"Error in LoadFoldersAndFiles observable: {ex.Message}");
+                UpdateStatus(Files.Count != 0 ? $"{Files.Count} file(s) loaded." : "No audio files found.");
             });
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateStatus("Loading cancelled.");
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"Error loading files: {ex.Message}");
+            Debug.WriteLine($"Error in LoadFoldersAndFiles: {ex.Message}");
+        }
     }
 
-    private async Task DeleteFileAsync(AudioFileItem fileItem)
+    private async Task DeleteFileAsync(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
 
-        Debug.WriteLine($"Attempting to delete: {fileItem.FullPath}");
+        Debug.WriteLine(string.Format(CultureInfo.InvariantCulture, "Attempting to delete: {0}", fileItem.FullPath));
 
         try
         {
             if (IsPlaying && CurrentPlayingFile == fileItem.Name)
             {
-                Stop();
+                await StopAsync().ConfigureAwait(false);
             }
 
-            File.Delete(fileItem.FullPath);
-            Files.Remove(fileItem);
-            UpdateStatus($"File '{fileItem.Name}' deleted.");
+            await Task.Run(() =>
+            {
+                if (!File.Exists(fileItem.FullPath))
+                {
+                    return false;
+                }
+
+                File.Delete(fileItem.FullPath);
+                return true;
+            }).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Files.Remove(fileItem);
+                UpdateStatus($"File '{fileItem.Name}' deleted.");
+            });
         }
         catch (Exception ex)
         {
@@ -165,33 +234,42 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void PlayPause()
+    private async Task PlayPauseAsync()
     {
         if (IsPlaying)
         {
-            _player.Stop();
+            await _player.StopFileAsync(_playbackCts?.Token ?? default).ConfigureAwait(false);
         }
         else if (!string.IsNullOrEmpty(CurrentPlayingFile))
         {
             var fileToPlay = Files.FirstOrDefault(f => f.Name == CurrentPlayingFile);
             if (fileToPlay != null)
             {
-                PlayFile(fileToPlay);
+                await PlayFileAsync(fileToPlay).ConfigureAwait(false);
             }
         }
     }
 
-    private void Stop()
+    private async Task StopAsync()
     {
-        _player.Stop();
+        _playbackCts?.CancelAsync();
+        await _player.StopFileAsync().ConfigureAwait(false);
     }
 
-    private void OpenFile(AudioFileItem fileItem)
+    private async Task OpenFileAsync(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
+
+        if (!File.Exists(fileItem.FullPath))
+        {
+            UpdateStatus($"File not found: {fileItem.Name}");
+            return;
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo(fileItem.FullPath) { UseShellExecute = true });
+            await Task.Run(() => { Process.Start(new ProcessStartInfo(fileItem.FullPath) { UseShellExecute = true }); })
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -200,30 +278,30 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void OnPlaybackStatusChanged(object sender, PlaybackStatusEventArgs e)
+    private void OnPlaybackStatusChanged(object? sender, PlaybackStatusEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            this.CurrentPlayingFile = e.CurrentFile;
-            this.IsPlaying = (e.State == PlaybackState.Playing || e.State == PlaybackState.Paused);
-            this.IsActuallyPlaying = (e.State == PlaybackState.Playing); 
-            
+            CurrentPlayingFile = e.FileName;
+            IsPlaying = e.State == PlaybackState.Playing || e.State == PlaybackState.Paused;
+            IsActuallyPlaying = e.State == PlaybackState.Playing;
+
             switch (e.State)
             {
                 case PlaybackState.Playing:
-                    this.PlaybackStatus = $"Playing: {e.CurrentFile}";
-                    UpdateStatus($"Playing: {e.CurrentFile}");
+                    PlaybackStatus = $"Playing: {e.FileName}";
+                    UpdateStatus($"Playing: {e.FileName}");
                     break;
                 case PlaybackState.Paused:
-                    this.PlaybackStatus = $"Paused: {e.CurrentFile}";
-                    UpdateStatus($"Paused: {e.CurrentFile}");
+                    PlaybackStatus = $"Paused: {e.FileName}";
+                    UpdateStatus($"Paused: {e.FileName}");
                     break;
                 case PlaybackState.Stopped:
-                    this.PlaybackStatus = "Stopped";
+                    PlaybackStatus = "Stopped";
                     UpdateStatus("Playback stopped.");
-                    if (e.CurrentFile == null)
+                    if (string.IsNullOrEmpty(e.FileName))
                     {
-                        this.CurrentPlayingFile = null;
+                        CurrentPlayingFile = string.Empty;
                     }
 
                     break;
@@ -231,41 +309,96 @@ public class FileExplorerViewModel : ViewModelBase, IDisposable
 
             if (!string.IsNullOrEmpty(e.ErrorMessage))
             {
-                this.PlaybackStatus = $"Error: {e.ErrorMessage}";
+                PlaybackStatus = $"Error: {e.ErrorMessage}";
                 UpdateStatus($"Error: {e.ErrorMessage}");
                 Debug.WriteLine($"Playback error: {e.ErrorMessage}");
-                this.IsPlaying = false;
+                IsPlaying = false;
+                IsActuallyPlaying = false;
             }
         });
     }
 
-    private void PlayFile(AudioFileItem fileItem)
+    public async Task StopPlaybackAsync()
+    {
+        if (_player.CurrentPlaybackState == PlaybackState.Playing ||
+            _player.CurrentPlaybackState == PlaybackState.Paused)
+        {
+            await _player.StopFileAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task PlayFileAsync(AudioFileItem? fileItem)
     {
         if (fileItem == null) return;
-        
-        string requestedFileName = fileItem.Name;
-        
-        if (this.CurrentPlayingFile == requestedFileName && 
-            (_player.CurrentPlaybackState == PlaybackState.Playing || _player.CurrentPlaybackState == PlaybackState.Paused))
+
+        if (!File.Exists(fileItem.FullPath))
         {
-            if (_player.CurrentPlaybackState == PlaybackState.Playing)
+            UpdateStatus($"File not found: {fileItem.Name}");
+            return;
+        }
+
+        _playbackCts?.CancelAsync();
+        _playbackCts?.Dispose();
+        _playbackCts = new CancellationTokenSource();
+
+        string requestedFileName = fileItem.Name;
+
+        try
+        {
+            if (CurrentPlayingFile == requestedFileName &&
+                (_player.CurrentPlaybackState == PlaybackState.Playing ||
+                 _player.CurrentPlaybackState == PlaybackState.Paused))
             {
-                _player.PausePlayback();
+                if (_player.CurrentPlaybackState == PlaybackState.Playing)
+                {
+                    await _player.PausePlaybackAsync(_playbackCts.Token).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _player.ResumePlaybackAsync(_playbackCts.Token).ConfigureAwait(false);
+                }
             }
             else
             {
-                _player.ResumePlayback();
+                await _player.PlayFileAsync(fileItem.FullPath, _playbackCts.Token).ConfigureAwait(false);
             }
         }
-        else 
+        catch (OperationCanceledException)
         {
-            _player.PlayFile(fileItem.FullPath);
+            UpdateStatus("Playback cancelled.");
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"Playback error: {ex.Message}");
+            Debug.WriteLine($"Playback error: {ex.Message}");
+        }
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _loadCancellationTokenSource?.Cancel();
+                _loadCancellationTokenSource?.Dispose();
+                _loadCancellationTokenSource = null;
+
+                _playbackCts?.Cancel();
+                _playbackCts?.Dispose();
+                _playbackCts = null;
+
+                _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
+                _player?.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 
     public void Dispose()
     {
-        _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
-        _player?.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
