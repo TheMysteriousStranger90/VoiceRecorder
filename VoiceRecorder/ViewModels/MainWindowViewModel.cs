@@ -79,11 +79,11 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentView = new FileExplorerViewModel();
     }
 
-    public void OnWindowClosing()
+    public async Task OnWindowClosingAsync()
     {
         if (_currentView is FileExplorerViewModel fileExplorerViewModel)
         {
-            fileExplorerViewModel.StopPlayback();
+            await fileExplorerViewModel.StopPlaybackAsync().ConfigureAwait(false);
         }
 
         Dispose();

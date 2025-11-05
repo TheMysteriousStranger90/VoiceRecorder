@@ -50,11 +50,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    private async void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
         {
-            viewModel.OnWindowClosing();
+            e.Cancel = true;
+            await viewModel.OnWindowClosingAsync().ConfigureAwait(false);
+            e.Cancel = false;
+            Close();
         }
     }
 

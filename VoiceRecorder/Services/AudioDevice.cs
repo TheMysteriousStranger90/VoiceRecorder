@@ -8,6 +8,7 @@ internal sealed class AudioDevice : IAudioDevice
 {
     private MMDeviceEnumerator? _mmdeviceEnumerator;
     private bool _disposed;
+    private readonly SemaphoreSlim _deviceLock = new(1, 1);
 
     public AudioDevice()
     {
@@ -22,100 +23,133 @@ internal sealed class AudioDevice : IAudioDevice
         }
     }
 
-    public IReadOnlyList<string> GetAvailableDevices()
+    public async Task<IReadOnlyList<string>> GetAvailableDevicesAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        await _deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_mmdeviceEnumerator != null)
+            return await Task.Run(() =>
             {
-                var devices = _mmdeviceEnumerator
-                    .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                    .ToList();
-
-                Debug.WriteLine($"Found {devices.Count} capture devices:");
-                foreach (var device in devices)
+                try
                 {
-                    Debug.WriteLine($"  - {device.FriendlyName} (ID: {device.DeviceID})");
+                    if (_mmdeviceEnumerator != null)
+                    {
+                        var devices = _mmdeviceEnumerator
+                            .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                            .ToList();
+
+                        Debug.WriteLine($"Found {devices.Count} capture devices:");
+                        foreach (var device in devices)
+                        {
+                            Debug.WriteLine($"  - {device.FriendlyName} (ID: {device.DeviceID})");
+                        }
+
+                        return (IReadOnlyList<string>)devices.Select(device => device.FriendlyName).ToList();
+                    }
+                }
+                catch (CoreAudioAPIException ex)
+                {
+                    Debug.WriteLine($"Error enumerating devices: {ex.Message}");
                 }
 
-                return devices.Select(device => device.FriendlyName).ToList();
-            }
+                return Array.Empty<string>();
+            }, cancellationToken).ConfigureAwait(false);
         }
-        catch (CoreAudioAPIException ex)
+        finally
         {
-            Debug.WriteLine($"Error enumerating devices: {ex.Message}");
+            _deviceLock.Release();
         }
-
-        return Array.Empty<string>();
     }
 
-    public string? GetDefaultDeviceName()
+    public async Task<string?> GetDefaultDeviceNameAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        await _deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_mmdeviceEnumerator != null)
+            return await Task.Run(() =>
             {
-                var defaultDevice = _mmdeviceEnumerator.GetDefaultAudioEndpoint(
-                    DataFlow.Capture,
-                    Role.Console);
+                try
+                {
+                    if (_mmdeviceEnumerator != null)
+                    {
+                        var defaultDevice = _mmdeviceEnumerator.GetDefaultAudioEndpoint(
+                            DataFlow.Capture,
+                            Role.Console);
 
-                Debug.WriteLine($"Default device: {defaultDevice.FriendlyName}");
-                return defaultDevice.FriendlyName;
-            }
+                        Debug.WriteLine($"Default device: {defaultDevice.FriendlyName}");
+                        return defaultDevice.FriendlyName;
+                    }
+                }
+                catch (CoreAudioAPIException ex)
+                {
+                    Debug.WriteLine($"Error getting default device: {ex.Message}");
+                }
+
+                return null;
+            }, cancellationToken).ConfigureAwait(false);
         }
-        catch (CoreAudioAPIException ex)
+        finally
         {
-            Debug.WriteLine($"Error getting default device: {ex.Message}");
+            _deviceLock.Release();
         }
-
-        return null;
     }
 
-    public MMDevice SelectDevice(string deviceName)
+    public async Task<MMDevice> SelectDeviceAsync(string deviceName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(deviceName);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        await _deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_mmdeviceEnumerator != null)
+            return await Task.Run(() =>
             {
-                var devices = _mmdeviceEnumerator
-                    .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
-                    .ToList();
-
-                var device = devices.FirstOrDefault(d => d.FriendlyName == deviceName);
-
-                if (device == null)
+                try
                 {
-                    Debug.WriteLine($"Device '{deviceName}' not found. Available devices:");
-                    foreach (var d in devices)
+                    if (_mmdeviceEnumerator != null)
                     {
-                        Debug.WriteLine($"  - {d.FriendlyName}");
-                    }
+                        var devices = _mmdeviceEnumerator
+                            .EnumAudioEndpoints(DataFlow.Capture, DeviceState.Active)
+                            .ToList();
 
-                    throw new InvalidOperationException($"Device with name '{deviceName}' not found.");
+                        var device = devices.FirstOrDefault(d => d.FriendlyName == deviceName);
+
+                        if (device == null)
+                        {
+                            Debug.WriteLine($"Device '{deviceName}' not found. Available devices:");
+                            foreach (var d in devices)
+                            {
+                                Debug.WriteLine($"  - {d.FriendlyName}");
+                            }
+
+                            throw new InvalidOperationException($"Device with name '{deviceName}' not found.");
+                        }
+
+                        Debug.WriteLine($"Selected device: {device.FriendlyName}");
+                        Debug.WriteLine($"Device ID: {device.DeviceID}");
+                        Debug.WriteLine($"Device State: {device.DeviceState}");
+                        Debug.WriteLine($"Is Default: {IsDefaultDevice(device)}");
+
+                        return device;
+                    }
+                }
+                catch (CoreAudioAPIException ex)
+                {
+                    Debug.WriteLine($"Error selecting device: {ex.Message}");
+                    throw;
                 }
 
-                Debug.WriteLine($"Selected device: {device.FriendlyName}");
-                Debug.WriteLine($"Device ID: {device.DeviceID}");
-                Debug.WriteLine($"Device State: {device.DeviceState}");
-                Debug.WriteLine($"Is Default: {IsDefaultDevice(device)}");
-
-                return device;
-            }
+                throw new InvalidOperationException("MMDeviceEnumerator is not initialized.");
+            }, cancellationToken).ConfigureAwait(false);
         }
-        catch (CoreAudioAPIException ex)
+        finally
         {
-            Debug.WriteLine($"Error selecting device: {ex.Message}");
-            throw;
+            _deviceLock.Release();
         }
-
-        throw new InvalidOperationException("MMDeviceEnumerator is not initialized.");
     }
 
     private bool IsDefaultDevice(MMDevice device)
@@ -144,6 +178,7 @@ internal sealed class AudioDevice : IAudioDevice
             {
                 _mmdeviceEnumerator?.Dispose();
                 _mmdeviceEnumerator = null;
+                _deviceLock.Dispose();
             }
 
             _disposed = true;

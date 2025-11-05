@@ -7,6 +7,8 @@ dotnet_diagnostic.CA1416.severity = warning
 
 dotnet_diagnostic.CA1812.severity = warning
 
+dotnet_diagnostic.CA1031.severity = warning
+
 
 [*]
 charset = utf-8-bom

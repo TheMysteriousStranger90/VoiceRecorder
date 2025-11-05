@@ -1,5 +1,4 @@
 ﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows.Input;
@@ -28,6 +27,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private string _filterTooltip = "Select an audio filter";
     private string _deviceTooltip = "Select a recording device";
     private bool _disposed;
+    private CancellationTokenSource? _recordingCts;
 
     public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
     public ObservableCollection<string> AvailableDevices { get; }
@@ -87,40 +87,9 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         _recorder = recorder ?? new AudioRecorder();
         _device = device ?? new AudioDevice();
 
-        try
-        {
-            var devices = _device.GetAvailableDevices();
-            AvailableDevices = new ObservableCollection<string>(devices);
+        AvailableDevices = new ObservableCollection<string>();
 
-            string? defaultDeviceName = _device.GetDefaultDeviceName();
-
-            if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
-            {
-                _selectedDevice = defaultDeviceName;
-            }
-            else if (AvailableDevices.Count > 0)
-            {
-                _selectedDevice = AvailableDevices[0];
-            }
-        }
-        catch (CoreAudioAPIException coreEx)
-        {
-            Debug.WriteLine($"Audio API error loading devices: {coreEx.Message}");
-            AvailableDevices = new ObservableCollection<string>();
-            UpdateStatus("Failed to load audio devices: Audio API error");
-        }
-        catch (InvalidOperationException ioEx)
-        {
-            Debug.WriteLine($"Invalid operation loading devices: {ioEx.Message}");
-            AvailableDevices = new ObservableCollection<string>();
-            UpdateStatus("Failed to load audio devices: Invalid operation");
-        }
-        catch (UnauthorizedAccessException uaEx)
-        {
-            Debug.WriteLine($"Access denied loading devices: {uaEx.Message}");
-            AvailableDevices = new ObservableCollection<string>();
-            UpdateStatus("Failed to load audio devices: Access denied");
-        }
+        Task.Run(async () => await InitializeDevicesAsync().ConfigureAwait(false));
 
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
@@ -141,15 +110,56 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
         var canStopRecording = this.WhenAnyValue(x => x.IsRecording);
 
-        StartRecordingCommand = ReactiveCommand.Create(StartRecording, canStartRecording);
-        StopRecordingCommand = ReactiveCommand.Create(StopRecording, canStopRecording);
-        OpenFolderCommand = ReactiveCommand.Create(OpenFolder);
+        StartRecordingCommand = ReactiveCommand.CreateFromTask(StartRecordingAsync, canStartRecording);
+        StopRecordingCommand = ReactiveCommand.CreateFromTask(StopRecordingAsync, canStopRecording);
+        OpenFolderCommand = ReactiveCommand.CreateFromTask(OpenFolderAsync);
 
         _timer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(1)
         };
         _timer.Tick += Timer_Tick;
+    }
+
+    private async Task InitializeDevicesAsync()
+    {
+        try
+        {
+            var devices = await _device.GetAvailableDevicesAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AvailableDevices.Clear();
+                foreach (var device in devices)
+                {
+                    AvailableDevices.Add(device);
+                }
+            });
+
+            string? defaultDeviceName = await _device.GetDefaultDeviceNameAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
+                {
+                    SelectedDevice = defaultDeviceName;
+                }
+                else if (AvailableDevices.Count > 0)
+                {
+                    SelectedDevice = AvailableDevices[0];
+                }
+            });
+        }
+        catch (CoreAudioAPIException coreEx)
+        {
+            Debug.WriteLine($"Audio API error loading devices: {coreEx.Message}");
+            UpdateStatus("Failed to load audio devices: Audio API error");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error loading devices: {ex.Message}");
+            UpdateStatus($"Failed to load audio devices: {ex.Message}");
+        }
     }
 
     private void UpdateTooltips()
@@ -171,13 +181,17 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
     }
 
-    private void StartRecording()
+    private async Task StartRecordingAsync()
     {
         if (_disposed)
         {
             UpdateStatus("Cannot start recording: view model is disposed");
             return;
         }
+
+        _recordingCts?.CancelAsync();
+        _recordingCts?.Dispose();
+        _recordingCts = new CancellationTokenSource();
 
         try
         {
@@ -204,51 +218,65 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 Directory.CreateDirectory(directory);
             }
 
-            var device = _device.SelectDevice(SelectedDevice);
+            var device = await _device.SelectDeviceAsync(SelectedDevice, _recordingCts.Token).ConfigureAwait(false);
 
             _recorder.RecordingStarted += OnRecordingStarted;
 
-            _recorder.StartRecording(
+            await _recorder.StartRecordingAsync(
                 filePath,
                 device,
-                SelectedFilterViewModel?.FilterStrategy);
+                SelectedFilterViewModel?.FilterStrategy,
+                _recordingCts.Token).ConfigureAwait(false);
 
-            IsRecording = true;
-
-            string filterName = SelectedFilterViewModel?.ToString() ?? "No filter";
-            UpdateStatus($"Recording started: {Path.GetFileName(filePath)} | Filter: {filterName}");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsRecording = true;
+                string filterName = SelectedFilterViewModel?.ToString() ?? "No filter";
+                UpdateStatus($"Recording started: {Path.GetFileName(filePath)} | Filter: {filterName}");
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdateStatus("Recording cancelled");
+                IsRecording = false;
+                _timer.Stop();
+                _stopwatch.Reset();
+            });
         }
         catch (UnauthorizedAccessException ex)
         {
-            UpdateStatus("Please enable microphone access in Windows Privacy Settings");
-            Debug.WriteLine($"Microphone access denied: {ex.Message}");
-            IsRecording = false;
-            _timer.Stop();
-            _stopwatch.Reset();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdateStatus("Please enable microphone access in Windows Privacy Settings");
+                Debug.WriteLine($"Microphone access denied: {ex.Message}");
+                IsRecording = false;
+                _timer.Stop();
+                _stopwatch.Reset();
+            });
         }
         catch (AudioRecorderException ex)
         {
-            UpdateStatus("Failed to start recording. Please check your microphone.");
-            Debug.WriteLine($"Recording error: {ex.Message}");
-            IsRecording = false;
-            _timer.Stop();
-            _stopwatch.Reset();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdateStatus("Failed to start recording. Please check your microphone.");
+                Debug.WriteLine($"Recording error: {ex.Message}");
+                IsRecording = false;
+                _timer.Stop();
+                _stopwatch.Reset();
+            });
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            UpdateStatus($"Recording error: {ex.Message}");
-            Debug.WriteLine($"Invalid operation: {ex.Message}");
-            IsRecording = false;
-            _timer.Stop();
-            _stopwatch.Reset();
-        }
-        catch (IOException ioEx)
-        {
-            UpdateStatus("Failed to create recording file. Check disk space and permissions.");
-            Debug.WriteLine($"I/O error: {ioEx.Message}");
-            IsRecording = false;
-            _timer.Stop();
-            _stopwatch.Reset();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdateStatus($"Recording error: {ex.Message}");
+                Debug.WriteLine($"Error: {ex.Message}");
+                IsRecording = false;
+                _timer.Stop();
+                _stopwatch.Reset();
+            });
         }
     }
 
@@ -263,7 +291,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         _recorder.RecordingStarted -= OnRecordingStarted;
     }
 
-    private void StopRecording()
+    private async Task StopRecordingAsync()
     {
         if (_disposed)
         {
@@ -272,23 +300,34 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
         try
         {
-            _recorder.StopRecording();
-            _stopwatch.Stop();
-            _timer.Stop();
-            IsRecording = false;
-            UpdateStatus($"Recording saved - Duration: {TimerText}");
+            await _recorder.StopRecordingAsync(_recordingCts?.Token ?? default).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _stopwatch.Stop();
+                _timer.Stop();
+                IsRecording = false;
+                UpdateStatus($"Recording saved - Duration: {TimerText}");
+            });
         }
         catch (AudioRecorderException ex)
         {
-            UpdateStatus("Error stopping recording");
-            Debug.WriteLine($"Error stopping recording: {ex.Message}");
-            IsRecording = false;
-            _timer.Stop();
-            _stopwatch.Reset();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdateStatus("Error stopping recording");
+                Debug.WriteLine($"Error stopping recording: {ex.Message}");
+                IsRecording = false;
+                _timer.Stop();
+                _stopwatch.Reset();
+            });
+        }
+        finally
+        {
+            _recordingCts?.CancelAsync();
         }
     }
 
-    private void OpenFolder()
+    private async Task OpenFolderAsync()
     {
         string folderPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -296,32 +335,28 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
         try
         {
-            if (!Directory.Exists(folderPath))
+            await Task.Run(() =>
             {
-                Directory.CreateDirectory(folderPath);
-            }
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
 
-            Process.Start(new ProcessStartInfo
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = folderPath,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                FileName = folderPath,
-                UseShellExecute = true,
-                Verb = "open"
+                UpdateStatus($"Failed to open folder: {ex.Message}");
+                Debug.WriteLine($"Error opening folder: {ex.Message}");
             });
-        }
-        catch (Win32Exception ex)
-        {
-            UpdateStatus($"Failed to open folder: {ex.Message}");
-            Debug.WriteLine($"Win32 error opening folder: {ex.Message}");
-        }
-        catch (IOException ioEx)
-        {
-            UpdateStatus($"I/O error opening folder: {ioEx.Message}");
-            Debug.WriteLine($"I/O error opening folder: {ioEx.Message}");
-        }
-        catch (UnauthorizedAccessException uaEx)
-        {
-            UpdateStatus($"Access denied opening folder: {uaEx.Message}");
-            Debug.WriteLine($"Access denied opening folder: {uaEx.Message}");
         }
     }
 
@@ -335,20 +370,19 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 {
                     try
                     {
-                        StopRecording();
+                        StopRecordingAsync().GetAwaiter().GetResult();
                     }
-                    catch (AudioRecorderException arEx)
+                    catch (Exception ex)
                     {
-                        Debug.WriteLine($"AudioRecorderException stopping recording during dispose: {arEx.Message}");
-                    }
-                    catch (InvalidOperationException ioEx)
-                    {
-                        Debug.WriteLine($"InvalidOperationException stopping recording during dispose: {ioEx.Message}");
+                        Debug.WriteLine($"Error stopping recording during dispose: {ex.Message}");
                     }
                 }
 
                 _timer.Stop();
                 _timer.Tick -= Timer_Tick;
+
+                _recordingCts?.Cancel();
+                _recordingCts?.Dispose();
 
                 _recorder?.Dispose();
                 _device?.Dispose();

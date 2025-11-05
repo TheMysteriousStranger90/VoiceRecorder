@@ -13,207 +13,249 @@ namespace VoiceRecorder.Services;
 
 internal sealed class AudioRecorder : IAudioRecorder
 {
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in Dispose method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed")]
     private WasapiCapture? _capture;
 
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in Dispose method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed")]
     private WaveWriter? _writer;
 
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "Disposed in Dispose method")]
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed")]
     private SoundInSource? _soundInSource;
 
     private IWaveSource? _filteredSource;
     private bool _disposed;
+    private readonly SemaphoreSlim _recordingLock = new(1, 1);
+    private CancellationTokenSource? _recordingCts;
 
     public IWaveSource? CaptureSource => _soundInSource;
+    public bool IsRecording { get; private set; }
 
     public event EventHandler? RecordingStarted;
 
-    public void StartRecording(string outputFilePath, MMDevice device, IAudioFilter? filter)
+    public async Task StartRecordingAsync(string outputFilePath, MMDevice device, IAudioFilter? filter,
+        CancellationToken cancellationToken = default)
     {
+        await _recordingLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100);
-            _capture.Device = device;
-            _capture.Initialize();
-
-            _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
-
-            _filteredSource = filter != null
-                ? filter.ApplyFilter(_soundInSource)
-                : _soundInSource;
-
-            _writer = new WaveWriter(outputFilePath, _filteredSource.WaveFormat);
-
-            byte[] buffer = new byte[_filteredSource.WaveFormat.BytesPerSecond / 2];
-
-            _capture.DataAvailable += (s, e) =>
+            if (IsRecording)
             {
-                try
-                {
-                    int read;
-                    while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        _writer?.Write(buffer, 0, read);
-                    }
-                }
-                catch (ObjectDisposedException ex)
-                {
-                    Debug.WriteLine($"Object disposed in DataAvailable: {ex.Message}");
-                }
-                catch (IOException ex)
-                {
-                    Debug.WriteLine($"IO error in DataAvailable: {ex.Message}");
-                }
-                catch (InvalidOperationException ex)
-                {
-                    Debug.WriteLine($"Invalid operation in DataAvailable: {ex.Message}");
-                }
-            };
+                throw new InvalidOperationException("Recording is already in progress");
+            }
 
-            _capture.Start();
+            _recordingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
+            await Task.Run(() => InitializeRecording(outputFilePath, device, filter, _recordingCts.Token),
+                    _recordingCts.Token)
+                .ConfigureAwait(false);
+
+            IsRecording = true;
             RecordingStarted?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+            await CleanupResourcesAsync().ConfigureAwait(false);
+            throw;
         }
         catch (CoreAudioAPIException ex) when (ex.ErrorCode == unchecked((int)0x80070005))
         {
-            CleanupResources();
+            await CleanupResourcesAsync().ConfigureAwait(false);
             throw new UnauthorizedAccessException(
                 "Microphone access is denied. Please check your privacy settings.", ex);
         }
         catch (CoreAudioAPIException ex)
         {
-            CleanupResources();
+            await CleanupResourcesAsync().ConfigureAwait(false);
             throw new AudioRecorderException("Failed to initialize audio capture device", ex);
         }
         catch (IOException ex)
         {
-            CleanupResources();
+            await CleanupResourcesAsync().ConfigureAwait(false);
             throw new AudioRecorderException($"Failed to create output file: {outputFilePath}", ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            CleanupResources();
+            await CleanupResourcesAsync().ConfigureAwait(false);
             throw new AudioRecorderException("Access denied to output file or microphone", ex);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
-            CleanupResources();
-            throw new AudioRecorderException("Invalid argument provided", ex);
+            await CleanupResourcesAsync().ConfigureAwait(false);
+            throw new AudioRecorderException("Failed to start recording", ex);
         }
-        catch (InvalidOperationException ex)
+        finally
         {
-            CleanupResources();
-            throw new AudioRecorderException("Invalid operation during recording initialization", ex);
-        }
-    }
-
-    public void StopRecording()
-    {
-        if (_capture == null)
-        {
-            return;
-        }
-
-        try
-        {
-            _capture.Stop();
-        }
-        catch (CoreAudioAPIException ex)
-        {
-            Debug.WriteLine($"Audio API error stopping capture: {ex.Message}");
-        }
-        catch (InvalidOperationException ex)
-        {
-            Debug.WriteLine($"Invalid operation stopping capture: {ex.Message}");
-        }
-
-        try
-        {
-            if (_writer != null)
-            {
-                _writer.Dispose();
-                _writer = null;
-            }
-        }
-        catch (IOException ex)
-        {
-            Debug.WriteLine($"IO error disposing writer: {ex.Message}");
-        }
-        catch (ObjectDisposedException ex)
-        {
-            Debug.WriteLine($"Writer already disposed: {ex.Message}");
+            _recordingLock.Release();
         }
     }
 
-    private void CleanupResources()
+    private void InitializeRecording(string outputFilePath, MMDevice device, IAudioFilter? filter,
+        CancellationToken cancellationToken)
     {
-        if (_capture != null)
-        {
-            try
-            {
-                _capture.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Capture already disposed: {ex.Message}");
-            }
-            catch (CoreAudioAPIException ex)
-            {
-                Debug.WriteLine($"Audio API error disposing capture: {ex.Message}");
-            }
-            finally
-            {
-                _capture = null;
-            }
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (_soundInSource != null)
+        _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100)
         {
-            try
-            {
-                _soundInSource.Dispose();
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Debug.WriteLine($"Sound source already disposed: {ex.Message}");
-            }
-            finally
-            {
-                _soundInSource = null;
-            }
-        }
+            Device = device
+        };
+        _capture.Initialize();
 
-        if (_writer != null)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
+
+        _filteredSource = filter != null
+            ? filter.ApplyFilter(_soundInSource)
+            : _soundInSource;
+
+        _writer = new WaveWriter(outputFilePath, _filteredSource.WaveFormat);
+
+        byte[] buffer = new byte[_filteredSource.WaveFormat.BytesPerSecond / 2];
+
+        _capture.DataAvailable += (s, e) =>
         {
+            if (cancellationToken.IsCancellationRequested) return;
+
             try
             {
-                _writer.Dispose();
+                int read;
+                while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    _writer?.Write(buffer, 0, read);
+                }
             }
             catch (ObjectDisposedException ex)
             {
-                Debug.WriteLine($"Writer already disposed: {ex.Message}");
+                Debug.WriteLine($"Object disposed in DataAvailable: {ex.Message}");
             }
             catch (IOException ex)
             {
-                Debug.WriteLine($"IO error disposing writer: {ex.Message}");
+                Debug.WriteLine($"IO error in DataAvailable: {ex.Message}");
             }
-            finally
+            catch (InvalidOperationException ex)
             {
-                _writer = null;
+                Debug.WriteLine($"Invalid operation in DataAvailable: {ex.Message}");
             }
-        }
+        };
 
-        _filteredSource = null;
+        _capture.Start();
+    }
+
+    public async Task StopRecordingAsync(CancellationToken cancellationToken = default)
+    {
+        await _recordingLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!IsRecording)
+            {
+                return;
+            }
+
+            _recordingCts?.CancelAsync();
+
+            await Task.Run(() =>
+            {
+                if (_capture != null)
+                {
+                    try
+                    {
+                        _capture.Stop();
+                    }
+                    catch (CoreAudioAPIException ex)
+                    {
+                        Debug.WriteLine($"Audio API error stopping capture: {ex.Message}");
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Debug.WriteLine($"Invalid operation stopping capture: {ex.Message}");
+                    }
+                }
+
+                if (_writer != null)
+                {
+                    try
+                    {
+                        _writer.Dispose();
+                        _writer = null;
+                    }
+                    catch (IOException ex)
+                    {
+                        Debug.WriteLine($"IO error disposing writer: {ex.Message}");
+                    }
+                    catch (ObjectDisposedException ex)
+                    {
+                        Debug.WriteLine($"Writer already disposed: {ex.Message}");
+                    }
+                }
+            }, cancellationToken).ConfigureAwait(false);
+
+            IsRecording = false;
+        }
+        finally
+        {
+            _recordingLock.Release();
+        }
+    }
+
+    private async Task CleanupResourcesAsync()
+    {
+        await Task.Run(() =>
+        {
+            if (_capture != null)
+            {
+                try
+                {
+                    _capture.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error disposing capture: {ex.Message}");
+                }
+                finally
+                {
+                    _capture = null;
+                }
+            }
+
+            if (_soundInSource != null)
+            {
+                try
+                {
+                    _soundInSource.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error disposing sound source: {ex.Message}");
+                }
+                finally
+                {
+                    _soundInSource = null;
+                }
+            }
+
+            if (_writer != null)
+            {
+                try
+                {
+                    _writer.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error disposing writer: {ex.Message}");
+                }
+                finally
+                {
+                    _writer = null;
+                }
+            }
+
+            _filteredSource = null;
+        }).ConfigureAwait(false);
     }
 
     public void UpdateSource(IWaveSource newSource)
     {
         ArgumentNullException.ThrowIfNull(newSource);
-
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_capture != null)
@@ -222,13 +264,9 @@ internal sealed class AudioRecorder : IAudioRecorder
             {
                 _capture.Stop();
             }
-            catch (CoreAudioAPIException ex)
+            catch (Exception ex)
             {
-                Debug.WriteLine($"Audio API error stopping capture: {ex.Message}");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Debug.WriteLine($"Invalid operation stopping capture: {ex.Message}");
+                Debug.WriteLine($"Error stopping capture: {ex.Message}");
             }
         }
 
@@ -240,29 +278,23 @@ internal sealed class AudioRecorder : IAudioRecorder
             {
                 _capture.Start();
             }
-            catch (CoreAudioAPIException ex)
+            catch (Exception ex)
             {
-                Debug.WriteLine($"Audio API error restarting capture: {ex.Message}");
+                Debug.WriteLine($"Error restarting capture: {ex.Message}");
             }
-            catch (InvalidOperationException ex)
-            {
-                Debug.WriteLine($"Invalid operation restarting capture: {ex.Message}");
-            }
-        }
-        else if (_soundInSource == null)
-        {
-            Debug.WriteLine("newSource is not a SoundInSource");
         }
     }
 
-    private void Dispose(bool disposing)
+    private async void Dispose(bool disposing)
     {
         if (!_disposed)
         {
             if (disposing)
             {
-                StopRecording();
-                CleanupResources();
+                await StopRecordingAsync().ConfigureAwait(false);
+                await CleanupResourcesAsync().ConfigureAwait(false);
+                _recordingCts?.Dispose();
+                _recordingLock.Dispose();
             }
 
             _disposed = true;
