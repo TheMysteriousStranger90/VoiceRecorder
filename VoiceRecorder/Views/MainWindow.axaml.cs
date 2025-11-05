@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.ViewModels;
@@ -11,6 +12,7 @@ namespace VoiceRecorder.Views;
 public partial class MainWindow : Window
 {
     private readonly IThemeService _themeService;
+    private bool _isClosing;
 
     public MainWindow()
     {
@@ -52,12 +54,31 @@ public partial class MainWindow : Window
 
     private async void OnWindowClosing(object? sender, CancelEventArgs e)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         if (DataContext is MainWindowViewModel viewModel)
         {
             e.Cancel = true;
-            await viewModel.OnWindowClosingAsync().ConfigureAwait(false);
-            e.Cancel = false;
-            Close();
+            _isClosing = true;
+
+            try
+            {
+                await viewModel.OnWindowClosingAsync().ConfigureAwait(true);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    Closing -= OnWindowClosing;
+                    Close();
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error during window closing: {ex.Message}");
+                _isClosing = false;
+            }
         }
     }
 
