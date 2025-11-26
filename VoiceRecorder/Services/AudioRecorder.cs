@@ -32,7 +32,7 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             CleanupCapture();
 
-            _capture = new WasapiCapture(true, AudioClientShareMode.Shared, 100)
+            _capture = new WasapiCapture(false, AudioClientShareMode.Shared, 100)
             {
                 Device = device
             };
@@ -66,9 +66,10 @@ internal sealed class AudioRecorder : IAudioRecorder
             if (_capture == null || _soundInSource == null)
                 throw new InvalidOperationException("Device not initialized. Call SetDeviceAsync first.");
 
+            var freshSoundInSource = new SoundInSource(_capture) { FillWithZeros = false };
             _filteredSource = filter != null
-                ? filter.ApplyFilter(_soundInSource)
-                : _soundInSource;
+                ? filter.ApplyFilter(freshSoundInSource)
+                : freshSoundInSource;
 
             try
             {
@@ -79,9 +80,8 @@ internal sealed class AudioRecorder : IAudioRecorder
                 throw new AudioRecorderException($"Failed to create output file: {outputFilePath}", ex);
             }
 
-            _capture.Start();
-
             IsRecording = true;
+            _capture.Start();
             RecordingStarted?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
@@ -158,6 +158,7 @@ internal sealed class AudioRecorder : IAudioRecorder
             _writer = null;
         }
 
+        _filteredSource?.Dispose();
         _filteredSource = null;
         return Task.CompletedTask;
     }
