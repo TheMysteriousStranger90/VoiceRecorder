@@ -64,8 +64,8 @@
                                 <TextBlock Text="{Binding Name}"
                                            VerticalAlignment="Center"
                                            FontWeight="Medium"
-                                           Foreground="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile, 
-                                                    Converter={StaticResource PlayingFileConverter}, 
+                                           Foreground="{Binding $parent[UserControl].((vm:FileExplorerViewModel)DataContext).CurrentPlayingFile,
+                                                    Converter={StaticResource PlayingFileConverter},
                                                     ConverterParameter={Binding}}"/>
                                 <TextBlock FontSize="10" Foreground="LightGray" Text="{Binding RelativePath}"/>
                                 <TextBlock FontSize="10" Foreground="WhiteSmoke">
@@ -99,9 +99,9 @@
                 Margin="10"
                 Padding="15"
                 IsVisible="{Binding IsPlaying}">
-            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto">
 
-                <StackPanel Grid.Column="1" Grid.Row="0" Margin="15,0" VerticalAlignment="Center">
+                <StackPanel Grid.Row="0" Margin="0,0,0,10" VerticalAlignment="Center">
                     <TextBlock Text="{Binding CurrentPlayingFile}"
                                Foreground="White"
                                FontSize="14"
@@ -111,20 +111,70 @@
                                FontSize="12"/>
                 </StackPanel>
 
-                <Button Grid.Column="2" Grid.Row="0"
-                        Command="{Binding StopCommand}">
-                    <PathIcon Data="{StaticResource StopIcon}"
-                              Width="24"
-                              Height="24"/>
-                </Button>
-                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                <!-- Progress Bar -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                    <Slider Grid.Column="0"
+                            Value="{Binding PlaybackProgress}"
+                            Minimum="0"
+                            Maximum="1"
+                            VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding CurrentPositionText}"
+                               Foreground="LightGray"
+                               FontSize="11"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Playback Controls -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                    <Button Command="{Binding SkipBackwardCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Margin="0,0,10,0"
+                            ToolTip.Tip="Skip Backward 10s">
+                        <PathIcon Data="M11.5,12L20,18V6M11,18V6L2.5,12L11,18Z" Width="20" Height="20"/>
+                    </Button>
+
+                    <Button Command="{Binding PlayPauseCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Margin="0,0,10,0"
+                            ToolTip.Tip="Play/Pause">
+                        <PathIcon Width="24" Height="24">
+                            <PathIcon.Data>
+                                <MultiBinding Converter="{StaticResource PlayPauseIconConverter}">
+                                    <Binding Path="IsActuallyPlaying"/>
+                                </MultiBinding>
+                            </PathIcon.Data>
+                        </PathIcon>
+                    </Button>
+
+                    <Button Command="{Binding StopCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Margin="0,0,10,0"
+                            ToolTip.Tip="Stop">
+                        <PathIcon Data="{StaticResource StopIcon}" Width="24" Height="24"/>
+                    </Button>
+
+                    <Button Command="{Binding SkipForwardCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTip.Tip="Skip Forward 10s">
+                        <PathIcon Data="M13,6V18L21.5,12M4,18L12.5,12L4,6V18Z" Width="20" Height="20"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Volume Control -->
+                <StackPanel Grid.Row="3"
                             Orientation="Horizontal"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,10,0,0">
+                            HorizontalAlignment="Stretch">
                     <PathIcon Data="{StaticResource VolumeIcon}"
                               Width="16"
                               Height="16"
-                              Margin="0,0,10,0" VerticalAlignment="Center"/>
+                              Margin="0,0,10,0"
+                              VerticalAlignment="Center"/>
                     <Slider Value="{Binding Volume}"
                             MinWidth="100"
                             Minimum="0"

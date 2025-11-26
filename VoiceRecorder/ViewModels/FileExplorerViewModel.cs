@@ -22,6 +22,10 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private CancellationTokenSource? _loadCancellationTokenSource;
     private CancellationTokenSource? _playbackCts;
+    private TimeSpan _currentPosition;
+    private TimeSpan _totalDuration;
+    private double _playbackProgress;
+    private bool _isSeeking;
 
     public bool IsPlaying
     {
@@ -57,7 +61,46 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public ObservableCollection<string> Folders { get; } = [];
+    public TimeSpan CurrentPosition
+    {
+        get => _currentPosition;
+        private set => this.RaiseAndSetIfChanged(ref _currentPosition, value);
+    }
+
+    public TimeSpan TotalDuration
+    {
+        get => _totalDuration;
+        private set => this.RaiseAndSetIfChanged(ref _totalDuration, value);
+    }
+
+    public double PlaybackProgress
+    {
+        get => _playbackProgress;
+        set
+        {
+            if (!_isSeeking && Math.Abs(_playbackProgress - value) > 0.001)
+            {
+                _isSeeking = true;
+                this.RaiseAndSetIfChanged(ref _playbackProgress, value);
+                var newPosition = TimeSpan.FromSeconds(TotalDuration.TotalSeconds * value);
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _player.SeekAsync(newPosition).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _isSeeking = false;
+                    }
+                });
+            }
+        }
+    }
+
+    public string CurrentPositionText => $"{CurrentPosition:mm\\:ss} / {TotalDuration:mm\\:ss}";
+
+    private ObservableCollection<string> Folders { get; } = [];
     public ObservableCollection<AudioFileItem> Files { get; } = [];
 
     public ReactiveCommand<AudioFileItem, Unit> OpenFileCommand { get; }
@@ -66,6 +109,8 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> RefreshFilesCommand { get; }
     public ICommand PlayPauseCommand { get; }
     public ICommand StopCommand { get; }
+    public ICommand SkipForwardCommand { get; }
+    public ICommand SkipBackwardCommand { get; }
 
     public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
@@ -78,6 +123,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     {
         _player = player ?? new AudioPlayer();
         _player.PlaybackStatusChanged += OnPlaybackStatusChanged;
+        _player.PlaybackProgressChanged += OnPlaybackProgressChanged;
 
         OpenFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(OpenFileAsync);
         PlayFileCommand = ReactiveCommand.CreateFromTask<AudioFileItem>(PlayFileAsync);
@@ -85,8 +131,41 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
         RefreshFilesCommand = ReactiveCommand.CreateFromTask(LoadFoldersAndFilesAsync);
         PlayPauseCommand = ReactiveCommand.CreateFromTask(PlayPauseAsync);
         StopCommand = ReactiveCommand.CreateFromTask(StopAsync);
+        SkipForwardCommand = ReactiveCommand.CreateFromTask(SkipForwardAsync);
+        SkipBackwardCommand = ReactiveCommand.CreateFromTask(SkipBackwardAsync);
 
         Task.Run(async () => await LoadFoldersAndFilesAsync().ConfigureAwait(false));
+    }
+
+    private async Task SkipForwardAsync()
+    {
+        var newPosition = CurrentPosition + TimeSpan.FromSeconds(10);
+        if (newPosition > TotalDuration)
+            newPosition = TotalDuration;
+        await _player.SeekAsync(newPosition).ConfigureAwait(false);
+    }
+
+    private async Task SkipBackwardAsync()
+    {
+        var newPosition = CurrentPosition - TimeSpan.FromSeconds(10);
+        if (newPosition < TimeSpan.Zero)
+            newPosition = TimeSpan.Zero;
+        await _player.SeekAsync(newPosition).ConfigureAwait(false);
+    }
+
+    private void OnPlaybackProgressChanged(object? sender, PlaybackProgressEventArgs e)
+    {
+        if (!_isSeeking)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                CurrentPosition = e.Position;
+                TotalDuration = e.Duration;
+                _playbackProgress = e.Progress;
+                this.RaisePropertyChanged(nameof(PlaybackProgress));
+                this.RaisePropertyChanged(nameof(CurrentPositionText));
+            });
+        }
     }
 
     public async Task LoadFoldersAndFilesAsync()
@@ -238,7 +317,14 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     {
         if (IsPlaying)
         {
-            await _player.StopFileAsync(_playbackCts?.Token ?? default).ConfigureAwait(false);
+            if (IsActuallyPlaying)
+            {
+                await _player.PausePlaybackAsync(_playbackCts?.Token ?? default).ConfigureAwait(false);
+            }
+            else
+            {
+                await _player.ResumePlaybackAsync(_playbackCts?.Token ?? default).ConfigureAwait(false);
+            }
         }
         else if (!string.IsNullOrEmpty(CurrentPlayingFile))
         {
@@ -299,6 +385,9 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                 case PlaybackState.Stopped:
                     PlaybackStatus = "Stopped";
                     UpdateStatus("Playback stopped.");
+                    CurrentPosition = TimeSpan.Zero;
+                    TotalDuration = TimeSpan.Zero;
+                    PlaybackProgress = 0;
                     if (string.IsNullOrEmpty(e.FileName))
                     {
                         CurrentPlayingFile = string.Empty;
@@ -389,6 +478,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                 _playbackCts = null;
 
                 _player.PlaybackStatusChanged -= OnPlaybackStatusChanged;
+                _player.PlaybackProgressChanged -= OnPlaybackProgressChanged;
                 _player?.Dispose();
             }
 
