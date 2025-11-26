@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:VoiceRecorder.ViewModels"
              xmlns:controls="clr-namespace:VoiceRecorder.Controls"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="VoiceRecorder.Views.RecordingView"
              x:DataType="vm:RecordingViewModel">
 

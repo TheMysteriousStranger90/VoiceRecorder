@@ -10,7 +10,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
         Opacity="0.9"
-        Title="Voice Recorder">
+        Title="AzioVoice Recorder">
 
     <Window.Styles>
         <StyleInclude Source="/Styles/MainTheme.axaml" />
