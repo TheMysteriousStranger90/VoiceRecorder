@@ -1,14 +1,13 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reactive.Concurrency;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Windows.Input;
-using Avalonia.Threading;
-using CSCore.CoreAudioAPI;
 using ReactiveUI;
-using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
-using VoiceRecorder.Models;
 using VoiceRecorder.Services;
 using VoiceRecorder.Utils;
 
@@ -17,29 +16,29 @@ namespace VoiceRecorder.ViewModels;
 internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 {
     private readonly IAudioRecorder _recorder;
-    private readonly IAudioDevice _device;
-    private readonly DispatcherTimer _timer;
+    private readonly IAudioDevice _deviceService;
     private readonly Stopwatch _stopwatch = new();
+    private readonly CompositeDisposable _disposables = new();
+    private IDisposable? _timerSubscription;
     private string _timerText = "00:00:00";
     private bool _isRecording;
     private VoiceFilterViewModel _selectedFilterViewModel;
     private string _selectedDevice = string.Empty;
+    private string _statusMessage = "Ready";
     private string _filterTooltip = "Select an audio filter";
     private string _deviceTooltip = "Select a recording device";
-    private bool _disposed;
-    private CancellationTokenSource? _recordingCts;
 
     public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
-    public ObservableCollection<string> AvailableDevices { get; }
+    public ObservableCollection<string> AvailableDevices { get; } = new();
+
     public ICommand StartRecordingCommand { get; }
     public ICommand StopRecordingCommand { get; }
     public ICommand OpenFolderCommand { get; }
 
-    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
-
-    private void UpdateStatus(string message)
+    public string StatusMessage
     {
-        StatusChanged?.Invoke(this, new StatusChangedEventArgs(message));
+        get => _statusMessage;
+        set => this.RaiseAndSetIfChanged(ref _statusMessage, value);
     }
 
     public bool IsRecording
@@ -82,25 +81,20 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _deviceTooltip, value);
     }
 
-    public RecordingViewModel(IAudioRecorder? recorder = null, IAudioDevice? device = null)
+    public RecordingViewModel(IAudioRecorder? recorder = null, IAudioDevice? deviceService = null)
     {
         _recorder = recorder ?? new AudioRecorder();
-        _device = device ?? new AudioDevice();
-
-        AvailableDevices = new ObservableCollection<string>();
-
-        Task.Run(async () => await InitializeDevicesAsync().ConfigureAwait(false));
+        _deviceService = deviceService ?? new AudioDevice();
 
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
-            new VoiceFilterViewModel(null!, null!),
-            new VoiceFilterViewModel(null!, new EchoFilter()),
-            new VoiceFilterViewModel(null!, new FlangerFilter()),
-            new VoiceFilterViewModel(null!, new DistortionFilter()),
-            new VoiceFilterViewModel(null!, new ChorusFilter()),
-            new VoiceFilterViewModel(null!, new CompressorFilter())
+            new VoiceFilterViewModel(null),
+            new VoiceFilterViewModel(new EchoFilter()),
+            new VoiceFilterViewModel(new FlangerFilter()),
+            new VoiceFilterViewModel(new DistortionFilter()),
+            new VoiceFilterViewModel(new ChorusFilter()),
+            new VoiceFilterViewModel(new CompressorFilter()),
         };
-
         _selectedFilterViewModel = AvailableFilters[0];
 
         var canStartRecording = this.WhenAnyValue(
@@ -114,51 +108,150 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         StopRecordingCommand = ReactiveCommand.CreateFromTask(StopRecordingAsync, canStopRecording);
         OpenFolderCommand = ReactiveCommand.CreateFromTask(OpenFolderAsync);
 
-        _timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(1)
-        };
-        _timer.Tick += Timer_Tick;
+        this.WhenAnyValue(x => x.SelectedDevice)
+            .Where(device => !string.IsNullOrEmpty(device))
+            .DistinctUntilChanged()
+            .SelectMany(InitializeRecorderWithDeviceAsync)
+            .Subscribe()
+            .DisposeWith(_disposables);
+
+        RxApp.MainThreadScheduler.Schedule(async () => await LoadDevicesAsync());
     }
 
-    private async Task InitializeDevicesAsync()
+    private async Task LoadDevicesAsync()
     {
         try
         {
-            var devices = await _device.GetAvailableDevicesAsync().ConfigureAwait(false);
+            var devices = await _deviceService.GetAvailableDevicesAsync();
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            AvailableDevices.Clear();
+            foreach (var device in devices)
             {
-                AvailableDevices.Clear();
-                foreach (var device in devices)
-                {
-                    AvailableDevices.Add(device);
-                }
-            });
+                AvailableDevices.Add(device);
+            }
 
-            string? defaultDeviceName = await _device.GetDefaultDeviceNameAsync().ConfigureAwait(false);
+            var defaultDeviceName = await _deviceService.GetDefaultDeviceNameAsync();
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
             {
-                if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
-                {
-                    SelectedDevice = defaultDeviceName;
-                }
-                else if (AvailableDevices.Count > 0)
-                {
-                    SelectedDevice = AvailableDevices[0];
-                }
-            });
-        }
-        catch (CoreAudioAPIException coreEx)
-        {
-            Debug.WriteLine($"Audio API error loading devices: {coreEx.Message}");
-            UpdateStatus("Failed to load audio devices: Audio API error");
+                SelectedDevice = defaultDeviceName;
+            }
+            else if (AvailableDevices.Count > 0)
+            {
+                SelectedDevice = AvailableDevices[0];
+            }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Error loading devices: {ex.Message}");
-            UpdateStatus($"Failed to load audio devices: {ex.Message}");
+            StatusMessage = "Failed to load audio devices";
+        }
+    }
+
+    private async Task<System.Reactive.Unit> InitializeRecorderWithDeviceAsync(string deviceName)
+    {
+        try
+        {
+            StatusMessage = "Initializing microphone...";
+            var device = await _deviceService.SelectDeviceAsync(deviceName);
+
+            await _recorder.SetDeviceAsync(device);
+
+            StatusMessage = "Ready to record";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Device error: {ex.Message}";
+            Debug.WriteLine($"Init error: {ex}");
+        }
+
+        return System.Reactive.Unit.Default;
+    }
+
+    private async Task StartRecordingAsync()
+    {
+        try
+        {
+            string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice);
+            string? directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await _recorder.StartRecordingAsync(
+                filePath,
+                SelectedFilterViewModel?.FilterStrategy);
+
+            IsRecording = true;
+            StatusMessage = $"Recording: {Path.GetFileName(filePath)}";
+
+            _stopwatch.Restart();
+            TimerText = "00:00:00";
+
+            _timerSubscription?.Dispose();
+            _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(_ =>
+                {
+                    TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+                });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            StatusMessage = "Microphone access denied!";
+            IsRecording = false;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+            IsRecording = false;
+            Debug.WriteLine($"Start error: {ex}");
+        }
+    }
+
+    private async Task StopRecordingAsync()
+    {
+        try
+        {
+            await _recorder.StopRecordingAsync();
+
+            _stopwatch.Stop();
+            _timerSubscription?.Dispose();
+
+            IsRecording = false;
+            StatusMessage = $"Saved. Duration: {TimerText}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Error saving recording";
+            Debug.WriteLine($"Stop error: {ex}");
+        }
+    }
+
+    private async Task OpenFolderAsync()
+    {
+        string folderPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "VoiceRecorder");
+
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = folderPath,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Cannot open folder: {ex.Message}";
         }
     }
 
@@ -176,225 +269,11 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void Timer_Tick(object? sender, EventArgs e)
-    {
-        TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-    }
-
-    private async Task StartRecordingAsync()
-    {
-        if (_disposed)
-        {
-            UpdateStatus("Cannot start recording: view model is disposed");
-            return;
-        }
-
-        _recordingCts?.CancelAsync();
-        _recordingCts?.Dispose();
-        _recordingCts = new CancellationTokenSource();
-
-        try
-        {
-            if (string.IsNullOrEmpty(SelectedDevice))
-            {
-                UpdateStatus("Please select a device");
-                return;
-            }
-
-            if (AvailableDevices.Count == 0 || !AvailableDevices.Contains(SelectedDevice))
-            {
-                UpdateStatus("Selected device is not available");
-                return;
-            }
-
-            _stopwatch.Reset();
-            TimerText = "00:00:00";
-
-            string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice);
-
-            string? directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var device = await _device.SelectDeviceAsync(SelectedDevice, _recordingCts.Token).ConfigureAwait(false);
-
-            _recorder.RecordingStarted += OnRecordingStarted;
-
-            await _recorder.StartRecordingAsync(
-                filePath,
-                device,
-                SelectedFilterViewModel?.FilterStrategy,
-                _recordingCts.Token).ConfigureAwait(false);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                IsRecording = true;
-                string filterName = SelectedFilterViewModel?.ToString() ?? "No filter";
-                UpdateStatus($"Recording started: {Path.GetFileName(filePath)} | Filter: {filterName}");
-            });
-        }
-        catch (OperationCanceledException)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus("Recording cancelled");
-                IsRecording = false;
-                _timer.Stop();
-                _stopwatch.Reset();
-            });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus("Please enable microphone access in Windows Privacy Settings");
-                Debug.WriteLine($"Microphone access denied: {ex.Message}");
-                IsRecording = false;
-                _timer.Stop();
-                _stopwatch.Reset();
-            });
-        }
-        catch (AudioRecorderException ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus("Failed to start recording. Please check your microphone.");
-                Debug.WriteLine($"Recording error: {ex.Message}");
-                IsRecording = false;
-                _timer.Stop();
-                _stopwatch.Reset();
-            });
-        }
-        catch (Exception ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus($"Recording error: {ex.Message}");
-                Debug.WriteLine($"Error: {ex.Message}");
-                IsRecording = false;
-                _timer.Stop();
-                _stopwatch.Reset();
-            });
-        }
-    }
-
-    private void OnRecordingStarted(object? sender, EventArgs e)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _stopwatch.Start();
-            _timer.Start();
-        });
-
-        _recorder.RecordingStarted -= OnRecordingStarted;
-    }
-
-    private async Task StopRecordingAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        try
-        {
-            await _recorder.StopRecordingAsync(_recordingCts?.Token ?? default).ConfigureAwait(false);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                _stopwatch.Stop();
-                _timer.Stop();
-                IsRecording = false;
-                UpdateStatus($"Recording saved - Duration: {TimerText}");
-            });
-        }
-        catch (AudioRecorderException ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus("Error stopping recording");
-                Debug.WriteLine($"Error stopping recording: {ex.Message}");
-                IsRecording = false;
-                _timer.Stop();
-                _stopwatch.Reset();
-            });
-        }
-        finally
-        {
-            _recordingCts?.CancelAsync();
-        }
-    }
-
-    private async Task OpenFolderAsync()
-    {
-        string folderPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "VoiceRecorder");
-
-        try
-        {
-            await Task.Run(() =>
-            {
-                if (!Directory.Exists(folderPath))
-                {
-                    Directory.CreateDirectory(folderPath);
-                }
-
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = folderPath,
-                    UseShellExecute = true,
-                    Verb = "open"
-                });
-            }).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                UpdateStatus($"Failed to open folder: {ex.Message}");
-                Debug.WriteLine($"Error opening folder: {ex.Message}");
-            });
-        }
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (!_disposed)
-        {
-            if (disposing)
-            {
-                if (IsRecording)
-                {
-                    try
-                    {
-                        StopRecordingAsync().GetAwaiter().GetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error stopping recording during dispose: {ex.Message}");
-                    }
-                }
-
-                _timer.Stop();
-                _timer.Tick -= Timer_Tick;
-
-                _recordingCts?.Cancel();
-                _recordingCts?.Dispose();
-
-                _recorder?.Dispose();
-                _device?.Dispose();
-            }
-
-            _disposed = true;
-        }
-    }
-
     public void Dispose()
     {
-        Dispose(true);
+        _timerSubscription?.Dispose();
+        _disposables.Dispose();
+        _recorder.Dispose();
         GC.SuppressFinalize(this);
     }
 }

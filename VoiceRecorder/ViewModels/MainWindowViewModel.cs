@@ -1,4 +1,5 @@
-﻿using System.Windows.Input;
+﻿using System.Reactive.Disposables;
+using System.Windows.Input;
 using ReactiveUI;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
@@ -13,6 +14,7 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private readonly IThemeService _themeService;
     private bool _isLightTheme;
+    private readonly SerialDisposable _statusSubscription = new();
 
     public string StatusMessage
     {
@@ -27,12 +29,12 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (_currentView is IDisposable disposableOld && _currentView != value)
             {
-                UnsubscribeFromStatusChanges(_currentView);
                 disposableOld.Dispose();
             }
 
             this.RaiseAndSetIfChanged(ref _currentView, value);
-            SubscribeToStatusChanges(value);
+
+            UpdateStatusSubscription(value);
         }
     }
 
@@ -60,7 +62,7 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme);
 
         _currentView = new RecordingViewModel();
-        ShowRecordingView();
+        UpdateStatusSubscription(_currentView);
     }
 
     private void ToggleTheme()
@@ -79,6 +81,35 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentView = new FileExplorerViewModel();
     }
 
+    private void UpdateStatusSubscription(ViewModelBase viewModel)
+    {
+        if (viewModel is RecordingViewModel recordingVm)
+        {
+            _statusSubscription.Disposable = recordingVm
+                .WhenAnyValue(x => x.StatusMessage)
+                .Subscribe(msg => StatusMessage = msg);
+        }
+        else if (viewModel is FileExplorerViewModel fileExplorerVm)
+        {
+            fileExplorerVm.StatusChanged += OnStatusChanged;
+
+            _statusSubscription.Disposable = Disposable.Create(() =>
+            {
+                fileExplorerVm.StatusChanged -= OnStatusChanged;
+            });
+        }
+        else
+        {
+            _statusSubscription.Disposable = Disposable.Empty;
+            StatusMessage = "Ready";
+        }
+    }
+
+    private void OnStatusChanged(object? sender, StatusChangedEventArgs e)
+    {
+        StatusMessage = e.Message;
+    }
+
     public async Task OnWindowClosingAsync()
     {
         if (_currentView is FileExplorerViewModel fileExplorerViewModel)
@@ -89,46 +120,16 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Dispose();
     }
 
-    private void SubscribeToStatusChanges(ViewModelBase viewModel)
-    {
-        switch (viewModel)
-        {
-            case RecordingViewModel recordingViewModel:
-                recordingViewModel.StatusChanged += OnStatusChanged;
-                break;
-            case FileExplorerViewModel fileExplorerViewModel:
-                fileExplorerViewModel.StatusChanged += OnStatusChanged;
-                break;
-        }
-    }
-
-    private void UnsubscribeFromStatusChanges(ViewModelBase viewModel)
-    {
-        switch (viewModel)
-        {
-            case RecordingViewModel recordingViewModel:
-                recordingViewModel.StatusChanged -= OnStatusChanged;
-                break;
-            case FileExplorerViewModel fileExplorerViewModel:
-                fileExplorerViewModel.StatusChanged -= OnStatusChanged;
-                break;
-        }
-    }
-
-    private void OnStatusChanged(object? sender, StatusChangedEventArgs e)
-    {
-        StatusMessage = e.Message;
-    }
-
     private void Dispose(bool disposing)
     {
         if (!_disposed)
         {
             if (disposing)
             {
+                _statusSubscription.Dispose();
+
                 if (_currentView is IDisposable disposable)
                 {
-                    UnsubscribeFromStatusChanges(_currentView);
                     disposable.Dispose();
                 }
             }
