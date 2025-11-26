@@ -1,0 +1,128 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:VoiceRecorder.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="VoiceRecorder.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <Design.DataContext>
+        <vm:SettingsViewModel />
+    </Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20" MaxWidth="600">
+
+            <!-- Header -->
+            <TextBlock Text="Settings"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,20" />
+
+            <!-- Audio Format Settings -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Audio Format"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <!-- Sample Rate -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Sample Rate (Hz)"
+                                   Foreground="LightGray" />
+                        <ComboBox ItemsSource="{Binding AvailableSampleRates}"
+                                  SelectedItem="{Binding SampleRate}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Audio sample rate in Hz (1-200 kHz)" />
+                    </StackPanel>
+
+                    <!-- Bits Per Sample -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Bits Per Sample"
+                                   Foreground="LightGray" />
+                        <ComboBox ItemsSource="{Binding AvailableBitsPerSample}"
+                                  SelectedItem="{Binding BitsPerSample}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Audio bit depth (8, 16, 24, or 32 bits)" />
+                    </StackPanel>
+
+                    <!-- Channels -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Channels"
+                                   Foreground="LightGray" />
+                        <ComboBox ItemsSource="{Binding AvailableChannels}"
+                                  SelectedItem="{Binding Channels}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Number of audio channels (1=Mono, 2=Stereo)" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Theme Settings -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Appearance"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="Second Theme"
+                                   VerticalAlignment="Center"
+                                   Foreground="LightGray" />
+                        <ToggleSwitch IsChecked="{Binding IsLightTheme}"
+                                      ToolTip.Tip="Toggle between main and second theme" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="10"
+                        Margin="0,10,0,0">
+                <Button Command="{Binding SaveSettingsCommand}"
+                        Content="Save Settings"
+                        Padding="20,10"
+                        ToolTip.Tip="Save current settings" />
+
+                <Button Command="{Binding ResetSettingsCommand}"
+                        Content="Reset to Default"
+                        Padding="20,10"
+                        ToolTip.Tip="Reset all settings to default values" />
+            </StackPanel>
+
+            <!-- Info Panel -->
+            <Border Background="#404050"
+                    CornerRadius="8"
+                    Padding="15"
+                    Margin="0,10,0,0">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="ℹ️ Information"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="LightGray"
+                               FontSize="12">
+                        <Run Text="• Higher sample rates provide better quality but larger file sizes" />
+                        <LineBreak />
+                        <Run Text="• 44100 Hz is standard CD quality" />
+                        <LineBreak />
+                        <Run Text="• 16-bit is recommended for most recordings" />
+                        <LineBreak />
+                        <Run Text="• Changes will apply to new recordings" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

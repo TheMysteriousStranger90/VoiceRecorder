@@ -13,6 +13,7 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private ViewModelBase _currentView;
     private bool _disposed;
     private readonly IThemeService _themeService;
+    private readonly ISettingsService _settingsService;
     private bool _isLightTheme;
     private readonly SerialDisposable _statusSubscription = new();
 
@@ -50,15 +51,21 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public ICommand ShowRecordingViewCommand { get; }
     public ICommand ShowFileExplorerCommand { get; }
+    public ICommand ShowSettingsCommand { get; }
     public ICommand ToggleThemeCommand { get; }
 
-    public MainWindowViewModel(IThemeService? themeService = null)
+    public MainWindowViewModel(IThemeService? themeService = null, ISettingsService? settingsService = null)
     {
         _themeService = themeService ?? new ThemeService();
-        _isLightTheme = _themeService.CurrentTheme == ThemeVariant.Second;
+        _settingsService = settingsService ?? new SettingsService();
+
+        var settings = _settingsService.LoadSettings();
+        _isLightTheme = settings.Theme == ThemeVariant.Second;
+        _themeService.SetTheme(settings.Theme);
 
         ShowRecordingViewCommand = ReactiveCommand.Create(ShowRecordingView);
         ShowFileExplorerCommand = ReactiveCommand.Create(ShowFileExplorer);
+        ShowSettingsCommand = ReactiveCommand.Create(ShowSettings);
         ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme);
 
         _currentView = new RecordingViewModel();
@@ -69,6 +76,10 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         IsLightTheme = !IsLightTheme;
         StatusMessage = IsLightTheme ? "Switched to Second Theme" : "Switched to Main Theme";
+
+        var settings = _settingsService.LoadSettings();
+        settings.Theme = IsLightTheme ? ThemeVariant.Second : ThemeVariant.Main;
+        _settingsService.SaveSettings(settings);
     }
 
     private void ShowRecordingView()
@@ -79,6 +90,11 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowFileExplorer()
     {
         CurrentView = new FileExplorerViewModel();
+    }
+
+    private void ShowSettings()
+    {
+        CurrentView = new SettingsViewModel(_settingsService, _themeService);
     }
 
     private void UpdateStatusSubscription(ViewModelBase viewModel)
@@ -97,6 +113,12 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 fileExplorerVm.StatusChanged -= OnStatusChanged;
             });
+        }
+        else if (viewModel is SettingsViewModel settingsVm)
+        {
+            settingsVm.StatusChanged += OnStatusChanged;
+
+            _statusSubscription.Disposable = Disposable.Create(() => { settingsVm.StatusChanged -= OnStatusChanged; });
         }
         else
         {

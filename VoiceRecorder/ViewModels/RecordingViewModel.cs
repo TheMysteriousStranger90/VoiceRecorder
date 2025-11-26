@@ -15,6 +15,7 @@ namespace VoiceRecorder.ViewModels;
 
 internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 {
+    private readonly ISettingsService _settingsService;
     private readonly IAudioRecorder _recorder;
     private readonly IAudioDevice _deviceService;
     private readonly Stopwatch _stopwatch = new();
@@ -81,10 +82,12 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _deviceTooltip, value);
     }
 
-    public RecordingViewModel(IAudioRecorder? recorder = null, IAudioDevice? deviceService = null)
+    public RecordingViewModel(IAudioRecorder? recorder = null, IAudioDevice? deviceService = null,
+        ISettingsService? settingsService = null)
     {
         _recorder = recorder ?? new AudioRecorder();
         _deviceService = deviceService ?? new AudioDevice();
+        _settingsService = settingsService ?? new SettingsService();
 
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
@@ -179,12 +182,15 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 Directory.CreateDirectory(directory);
             }
 
+            var settings = _settingsService.LoadSettings();
+
             await _recorder.StartRecordingAsync(
                 filePath,
-                SelectedFilterViewModel?.FilterStrategy);
-
+                SelectedFilterViewModel?.FilterStrategy,
+                settings);
             IsRecording = true;
-            StatusMessage = $"Recording: {Path.GetFileName(filePath)}";
+            StatusMessage =
+                $"Recording: {Path.GetFileName(filePath)} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
 
             _stopwatch.Restart();
             TimerText = "00:00:00";

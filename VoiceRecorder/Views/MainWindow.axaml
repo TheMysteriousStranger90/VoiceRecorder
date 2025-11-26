@@ -30,8 +30,8 @@
                         Command="{Binding ShowRecordingViewCommand}"
                         ToolTip.Tip="Recording">
                     <PathIcon Data="{StaticResource RecordIcon}"
-                             Width="20"
-                             Height="20" />
+                              Width="20"
+                              Height="20" />
                 </Button>
 
                 <!-- File Explorer Button -->
@@ -39,17 +39,18 @@
                         Command="{Binding ShowFileExplorerCommand}"
                         ToolTip.Tip="Files">
                     <PathIcon Data="{StaticResource FolderIcon}"
-                             Width="20"
-                             Height="20" />
+                              Width="20"
+                              Height="20" />
                 </Button>
 
-                <!-- Theme Toggle Button -->
+                <!-- Settings Button -->
                 <Button Classes="navButton"
-                        Command="{Binding ToggleThemeCommand}"
-                        ToolTip.Tip="Toggle Theme">
-                    <PathIcon Data="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                             Width="20"
-                             Height="20" />
+                        Command="{Binding ShowSettingsCommand}"
+                        ToolTip.Tip="Settings">
+                    <PathIcon
+                        Data="M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+                        Width="20"
+                        Height="20" />
                 </Button>
             </StackPanel>
         </Border>
@@ -58,8 +59,8 @@
         <Grid Grid.Column="1" RowDefinitions="*,Auto">
             <!-- Content Area -->
             <ContentControl Grid.Row="0"
-                           Content="{Binding CurrentView}"
-                           Margin="8,16,16,16" />
+                            Content="{Binding CurrentView}"
+                            Margin="8,16,16,16" />
 
             <!-- Status Bar -->
             <Border Grid.Row="1"
@@ -72,7 +73,7 @@
                            Foreground="White"
                            FontSize="14"
                            TextAlignment="Center"
-                           VerticalAlignment="Center"/>
+                           VerticalAlignment="Center" />
             </Border>
         </Grid>
     </Grid>

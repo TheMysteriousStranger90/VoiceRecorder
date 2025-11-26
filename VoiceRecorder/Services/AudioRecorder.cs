@@ -7,6 +7,7 @@ using CSCore.Streams;
 using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters.Interfaces;
 using VoiceRecorder.Interfaces;
+using VoiceRecorder.Models;
 
 namespace VoiceRecorder.Services;
 
@@ -55,7 +56,7 @@ internal sealed class AudioRecorder : IAudioRecorder
     }
 
     public async Task StartRecordingAsync(string outputFilePath, IAudioFilter? filter,
-        CancellationToken cancellationToken = default)
+        AudioSettings? settings = null, CancellationToken cancellationToken = default)
     {
         await _deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -67,9 +68,24 @@ internal sealed class AudioRecorder : IAudioRecorder
                 throw new InvalidOperationException("Device not initialized. Call SetDeviceAsync first.");
 
             var freshSoundInSource = new SoundInSource(_capture) { FillWithZeros = false };
+
+            IWaveSource processedSource = freshSoundInSource;
+
+            if (settings != null && settings.IsValid())
+            {
+                processedSource = processedSource
+                    .ChangeSampleRate(settings.SampleRate)
+                    .ToSampleSource()
+                    .ToWaveSource(settings.BitsPerSample);
+
+                processedSource = settings.Channels == 1
+                    ? processedSource.ToMono()
+                    : processedSource.ToStereo();
+            }
+
             _filteredSource = filter != null
-                ? filter.ApplyFilter(freshSoundInSource)
-                : freshSoundInSource;
+                ? filter.ApplyFilter(processedSource)
+                : processedSource;
 
             try
             {

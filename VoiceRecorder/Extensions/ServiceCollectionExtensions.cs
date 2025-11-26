@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<RecordingViewModel>();
         services.AddTransient<FileExplorerViewModel>();
+        services.AddTransient<SettingsViewModel>();
 
         return services;
     }
@@ -31,6 +32,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IAudioPlayer, AudioPlayer>();
 
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+
         return services;
     }
 }
