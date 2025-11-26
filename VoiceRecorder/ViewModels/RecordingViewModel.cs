@@ -233,7 +233,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     {
         string folderPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "VoiceRecorder");
+            "AzioVoiceRecorder");
 
         try
         {

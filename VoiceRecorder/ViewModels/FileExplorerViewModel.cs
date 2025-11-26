@@ -186,7 +186,7 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
 
         string basePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "VoiceRecorder");
+            "AzioVoiceRecorder");
 
         if (!Directory.Exists(basePath))
         {
