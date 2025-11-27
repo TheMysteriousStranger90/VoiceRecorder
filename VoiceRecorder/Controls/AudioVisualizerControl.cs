@@ -2,7 +2,6 @@
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
-using System.Security.Cryptography;
 
 namespace VoiceRecorder.Controls;
 
@@ -11,7 +10,13 @@ public class AudioVisualizerControl : TemplatedControl
     private readonly List<double> _barHeights;
     private readonly DispatcherTimer _timer;
     private const int BarCount = 32;
-    private readonly RandomNumberGenerator _random;
+    private readonly object _dataLock = new();
+    private readonly float[] _audioData = new float[BarCount];
+
+    private const double MinimumBarHeight = 0.08;
+    private const double AmplificationFactor = 15.0;
+    private const double SmoothingFactor = 0.65;
+    private const double DecaySpeed = 0.08;
 
     public static readonly StyledProperty<bool> IsActiveProperty =
         AvaloniaProperty.Register<AudioVisualizerControl, bool>(
@@ -37,7 +42,6 @@ public class AudioVisualizerControl : TemplatedControl
 
     public AudioVisualizerControl()
     {
-        _random = RandomNumberGenerator.Create();
         _barHeights = new List<double>(BarCount);
         for (int i = 0; i < BarCount; i++)
         {
@@ -46,10 +50,40 @@ public class AudioVisualizerControl : TemplatedControl
 
         _timer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(16)
+            Interval = TimeSpan.FromMilliseconds(40)
         };
         _timer.Tick += Timer_Tick;
         _timer.Start();
+    }
+
+    public void UpdateAudioData(float[] samples)
+    {
+        if (samples == null || samples.Length == 0) return;
+
+        lock (_dataLock)
+        {
+            int samplesPerBar = samples.Length / BarCount;
+            if (samplesPerBar < 1) samplesPerBar = 1;
+
+            for (int i = 0; i < BarCount; i++)
+            {
+                float sum = 0;
+                float maxSample = 0;
+                int startIndex = i * samplesPerBar;
+                int endIndex = Math.Min(startIndex + samplesPerBar, samples.Length);
+
+                for (int j = startIndex; j < endIndex; j++)
+                {
+                    float absSample = Math.Abs(samples[j]);
+                    sum += absSample;
+                    if (absSample > maxSample)
+                        maxSample = absSample;
+                }
+
+                float average = sum / (endIndex - startIndex);
+                _audioData[i] = (average * 0.7f) + (maxSample * 0.3f);
+            }
+        }
     }
 
     private void Timer_Tick(object? sender, EventArgs e)
@@ -60,26 +94,28 @@ public class AudioVisualizerControl : TemplatedControl
 
     private void UpdateBars()
     {
-        for (int i = 0; i < BarCount; i++)
+        lock (_dataLock)
         {
-            if (IsActive)
+            for (int i = 0; i < BarCount; i++)
             {
-                _barHeights[i] = Math.Max(0.1, Math.Min(1.0,
-                    _barHeights[i] + (GetSecureRandomDouble() * 0.2 - 0.1)));
-            }
-            else
-            {
-                _barHeights[i] = Math.Max(0, _barHeights[i] - 0.05);
+                if (IsActive)
+                {
+                    double rawValue = _audioData[i] * AmplificationFactor;
+                    double targetHeight = rawValue > 0.001
+                        ? Math.Min(1.0, Math.Log10(1 + rawValue * 9) / Math.Log10(10))
+                        : MinimumBarHeight;
+
+                    _barHeights[i] = _barHeights[i] * SmoothingFactor + targetHeight * (1 - SmoothingFactor);
+
+                    if (_barHeights[i] < MinimumBarHeight)
+                        _barHeights[i] = MinimumBarHeight;
+                }
+                else
+                {
+                    _barHeights[i] = Math.Max(0, _barHeights[i] - DecaySpeed);
+                }
             }
         }
-    }
-
-    private double GetSecureRandomDouble()
-    {
-        var bytes = new byte[8];
-        _random.GetBytes(bytes);
-        ulong uint64 = BitConverter.ToUInt64(bytes, 0) / (1UL << 11);
-        return uint64 / (double)(1UL << 53);
     }
 
     public override void Render(DrawingContext context)
@@ -90,6 +126,7 @@ public class AudioVisualizerControl : TemplatedControl
         context.FillRectangle(Brushes.Transparent, rect);
 
         float barWidth = (float)Bounds.Width / BarCount;
+        float spacing = 1f;
 
         for (int i = 0; i < BarCount; i++)
         {
@@ -97,7 +134,7 @@ public class AudioVisualizerControl : TemplatedControl
             var barRect = new Rect(
                 i * barWidth,
                 Bounds.Height - barHeight,
-                barWidth - 1,
+                Math.Max(1, barWidth - spacing),
                 barHeight);
 
             var gradient = new LinearGradientBrush
@@ -107,7 +144,8 @@ public class AudioVisualizerControl : TemplatedControl
                 GradientStops =
                 [
                     new GradientStop(Colors.Purple, 0),
-                    new GradientStop(Colors.Magenta, 1)
+                    new GradientStop(Colors.Magenta, 0.5),
+                    new GradientStop(Color.FromRgb(255, 100, 255), 1.0)
                 ]
             };
 

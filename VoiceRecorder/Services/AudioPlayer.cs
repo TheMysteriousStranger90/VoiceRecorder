@@ -22,6 +22,7 @@ internal sealed class AudioPlayer : IAudioPlayer
     private string? _currentFilePath;
     private readonly SemaphoreSlim _playbackLock = new(1, 1);
     private CancellationTokenSource? _playbackCts;
+    private System.Threading.Timer? _progressTimer;
 
     public float Volume
     {
@@ -38,7 +39,41 @@ internal sealed class AudioPlayer : IAudioPlayer
 
     public PlaybackState CurrentPlaybackState => _playbackState;
 
+    public TimeSpan Position
+    {
+        get
+        {
+            if (_waveSource != null && _waveSource.CanSeek)
+            {
+                return _waveSource.GetPosition();
+            }
+
+            return TimeSpan.Zero;
+        }
+        set
+        {
+            if (_waveSource != null && _waveSource.CanSeek)
+            {
+                _waveSource.SetPosition(value);
+            }
+        }
+    }
+
+    public TimeSpan Duration
+    {
+        get
+        {
+            if (_waveSource != null && _waveSource.CanSeek)
+            {
+                return _waveSource.GetLength();
+            }
+
+            return TimeSpan.Zero;
+        }
+    }
+
     public event EventHandler<PlaybackStatusEventArgs>? PlaybackStatusChanged;
+    public event EventHandler<PlaybackProgressEventArgs>? PlaybackProgressChanged;
 
     public async Task PlayFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
@@ -66,6 +101,8 @@ internal sealed class AudioPlayer : IAudioPlayer
                 }, _playbackCts.Token).ConfigureAwait(false);
 
                 _playbackState = PlaybackState.Playing;
+
+                StartProgressTimer();
 
                 PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
                     PlaybackState.Playing,
@@ -124,6 +161,7 @@ internal sealed class AudioPlayer : IAudioPlayer
                     {
                         _soundOut.Pause();
                         _playbackState = PlaybackState.Paused;
+                        StopProgressTimer();
                         PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
                             PlaybackState.Paused,
                             Path.GetFileName(_currentFilePath ?? string.Empty)));
@@ -154,6 +192,7 @@ internal sealed class AudioPlayer : IAudioPlayer
                     {
                         _soundOut.Play();
                         _playbackState = PlaybackState.Playing;
+                        StartProgressTimer();
                         PlaybackStatusChanged?.Invoke(this, new PlaybackStatusEventArgs(
                             PlaybackState.Playing,
                             Path.GetFileName(_currentFilePath ?? string.Empty)));
@@ -171,10 +210,54 @@ internal sealed class AudioPlayer : IAudioPlayer
         }
     }
 
+    public async Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
+    {
+        await _playbackLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_waveSource != null && _waveSource.CanSeek)
+            {
+                await Task.Run(() =>
+                {
+                    Position = position;
+                    NotifyProgressUpdate();
+                }, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _playbackLock.Release();
+        }
+    }
+
+    private void StartProgressTimer()
+    {
+        StopProgressTimer();
+        _progressTimer = new System.Threading.Timer(_ => NotifyProgressUpdate(), null, TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(100));
+    }
+
+    private void StopProgressTimer()
+    {
+        _progressTimer?.Dispose();
+        _progressTimer = null;
+    }
+
+    private void NotifyProgressUpdate()
+    {
+        if (_waveSource != null && _playbackState == PlaybackState.Playing)
+        {
+            var position = Position;
+            var duration = Duration;
+            PlaybackProgressChanged?.Invoke(this, new PlaybackProgressEventArgs(position, duration));
+        }
+    }
+
     private async void OnPlaybackStopped(object? sender, EventArgs e)
     {
         if (_playbackState != PlaybackState.Stopped)
         {
+            StopProgressTimer();
             string? lastFile = _currentFilePath != null ? Path.GetFileName(_currentFilePath) : null;
             await StopInternalAsync(lastFile, CancellationToken.None).ConfigureAwait(false);
         }
@@ -183,6 +266,8 @@ internal sealed class AudioPlayer : IAudioPlayer
     private async Task StopInternalAsync(string? previousFileOverride = null,
         CancellationToken cancellationToken = default)
     {
+        StopProgressTimer();
+
         await Task.Run(() =>
         {
             if (cancellationToken.IsCancellationRequested)
@@ -245,6 +330,7 @@ internal sealed class AudioPlayer : IAudioPlayer
     {
         if (!_disposed)
         {
+            StopProgressTimer();
             StopFileAsync().GetAwaiter().GetResult();
             _playbackCts?.Dispose();
             _playbackLock.Dispose();

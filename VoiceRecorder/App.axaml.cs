@@ -38,9 +38,23 @@ internal sealed class App : Application
 
     private void OnExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
     {
-        if (ServiceProvider is IDisposable disposable)
+        try
         {
-            disposable.Dispose();
+            if (sender is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.MainWindow?.Close();
+            }
+
+            if (ServiceProvider is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            System.Threading.Thread.Sleep(200);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error during exit: {ex.Message}");
         }
     }
 }

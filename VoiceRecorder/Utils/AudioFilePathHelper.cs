@@ -14,7 +14,7 @@ public static partial class AudioFilePathHelper
 
         string basePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "VoiceRecorder");
+            "AzioVoiceRecorder");
 
         string sanitizedDeviceName = SanitizeFileName(deviceName);
         string deviceFolder = Path.Combine(basePath, sanitizedDeviceName);

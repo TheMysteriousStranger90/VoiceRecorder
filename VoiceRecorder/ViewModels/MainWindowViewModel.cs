@@ -1,4 +1,5 @@
-﻿using System.Windows.Input;
+﻿using System.Reactive.Disposables;
+using System.Windows.Input;
 using ReactiveUI;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
@@ -12,7 +13,9 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private ViewModelBase _currentView;
     private bool _disposed;
     private readonly IThemeService _themeService;
+    private readonly ISettingsService _settingsService;
     private bool _isLightTheme;
+    private readonly SerialDisposable _statusSubscription = new();
 
     public string StatusMessage
     {
@@ -27,12 +30,12 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (_currentView is IDisposable disposableOld && _currentView != value)
             {
-                UnsubscribeFromStatusChanges(_currentView);
                 disposableOld.Dispose();
             }
 
             this.RaiseAndSetIfChanged(ref _currentView, value);
-            SubscribeToStatusChanges(value);
+
+            UpdateStatusSubscription(value);
         }
     }
 
@@ -48,25 +51,35 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public ICommand ShowRecordingViewCommand { get; }
     public ICommand ShowFileExplorerCommand { get; }
+    public ICommand ShowSettingsCommand { get; }
     public ICommand ToggleThemeCommand { get; }
 
-    public MainWindowViewModel(IThemeService? themeService = null)
+    public MainWindowViewModel(IThemeService? themeService = null, ISettingsService? settingsService = null)
     {
         _themeService = themeService ?? new ThemeService();
-        _isLightTheme = _themeService.CurrentTheme == ThemeVariant.Second;
+        _settingsService = settingsService ?? new SettingsService();
+
+        var settings = _settingsService.LoadSettings();
+        _isLightTheme = settings.Theme == ThemeVariant.Second;
+        _themeService.SetTheme(settings.Theme);
 
         ShowRecordingViewCommand = ReactiveCommand.Create(ShowRecordingView);
         ShowFileExplorerCommand = ReactiveCommand.Create(ShowFileExplorer);
+        ShowSettingsCommand = ReactiveCommand.Create(ShowSettings);
         ToggleThemeCommand = ReactiveCommand.Create(ToggleTheme);
 
         _currentView = new RecordingViewModel();
-        ShowRecordingView();
+        UpdateStatusSubscription(_currentView);
     }
 
     private void ToggleTheme()
     {
         IsLightTheme = !IsLightTheme;
         StatusMessage = IsLightTheme ? "Switched to Second Theme" : "Switched to Main Theme";
+
+        var settings = _settingsService.LoadSettings();
+        settings.Theme = IsLightTheme ? ThemeVariant.Second : ThemeVariant.Main;
+        _settingsService.SaveSettings(settings);
     }
 
     private void ShowRecordingView()
@@ -79,6 +92,46 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentView = new FileExplorerViewModel();
     }
 
+    private void ShowSettings()
+    {
+        CurrentView = new SettingsViewModel(_settingsService, _themeService);
+    }
+
+    private void UpdateStatusSubscription(ViewModelBase viewModel)
+    {
+        if (viewModel is RecordingViewModel recordingVm)
+        {
+            _statusSubscription.Disposable = recordingVm
+                .WhenAnyValue(x => x.StatusMessage)
+                .Subscribe(msg => StatusMessage = msg);
+        }
+        else if (viewModel is FileExplorerViewModel fileExplorerVm)
+        {
+            fileExplorerVm.StatusChanged += OnStatusChanged;
+
+            _statusSubscription.Disposable = Disposable.Create(() =>
+            {
+                fileExplorerVm.StatusChanged -= OnStatusChanged;
+            });
+        }
+        else if (viewModel is SettingsViewModel settingsVm)
+        {
+            settingsVm.StatusChanged += OnStatusChanged;
+
+            _statusSubscription.Disposable = Disposable.Create(() => { settingsVm.StatusChanged -= OnStatusChanged; });
+        }
+        else
+        {
+            _statusSubscription.Disposable = Disposable.Empty;
+            StatusMessage = "Ready";
+        }
+    }
+
+    private void OnStatusChanged(object? sender, StatusChangedEventArgs e)
+    {
+        StatusMessage = e.Message;
+    }
+
     public async Task OnWindowClosingAsync()
     {
         if (_currentView is FileExplorerViewModel fileExplorerViewModel)
@@ -89,46 +142,16 @@ internal sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Dispose();
     }
 
-    private void SubscribeToStatusChanges(ViewModelBase viewModel)
-    {
-        switch (viewModel)
-        {
-            case RecordingViewModel recordingViewModel:
-                recordingViewModel.StatusChanged += OnStatusChanged;
-                break;
-            case FileExplorerViewModel fileExplorerViewModel:
-                fileExplorerViewModel.StatusChanged += OnStatusChanged;
-                break;
-        }
-    }
-
-    private void UnsubscribeFromStatusChanges(ViewModelBase viewModel)
-    {
-        switch (viewModel)
-        {
-            case RecordingViewModel recordingViewModel:
-                recordingViewModel.StatusChanged -= OnStatusChanged;
-                break;
-            case FileExplorerViewModel fileExplorerViewModel:
-                fileExplorerViewModel.StatusChanged -= OnStatusChanged;
-                break;
-        }
-    }
-
-    private void OnStatusChanged(object? sender, StatusChangedEventArgs e)
-    {
-        StatusMessage = e.Message;
-    }
-
     private void Dispose(bool disposing)
     {
         if (!_disposed)
         {
             if (disposing)
             {
+                _statusSubscription.Dispose();
+
                 if (_currentView is IDisposable disposable)
                 {
-                    UnsubscribeFromStatusChanges(_currentView);
                     disposable.Dispose();
                 }
             }

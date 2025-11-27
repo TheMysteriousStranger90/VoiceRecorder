@@ -4,12 +4,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:VoiceRecorder.ViewModels"
              xmlns:controls="clr-namespace:VoiceRecorder.Controls"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="VoiceRecorder.Views.RecordingView"
              x:DataType="vm:RecordingViewModel">
 
     <StackPanel Margin="10">
         <controls:AudioVisualizerControl
+            x:Name="AudioVisualizer"
             Height="100"
             Margin="0,10,0,0"
             IsActive="{Binding IsRecording}" />
