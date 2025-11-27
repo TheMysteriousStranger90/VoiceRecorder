@@ -66,11 +66,14 @@ public partial class MainWindow : Window
 
             try
             {
-                await viewModel.OnWindowClosingAsync().ConfigureAwait(true);
+                _themeService.ThemeChanged -= OnThemeChanged;
+
+                await viewModel.OnWindowClosingAsync().ConfigureAwait(false);
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     Closing -= OnWindowClosing;
+                    DataContext = null;
                     Close();
                 });
             }
