@@ -25,6 +25,7 @@ internal sealed class AudioRecorder : IAudioRecorder
     public bool IsRecording { get; private set; }
 
     public event EventHandler? RecordingStarted;
+    public event EventHandler<AudioDataEventArgs>? AudioDataAvailable;
 
     public async Task SetDeviceAsync(MMDevice device)
     {
@@ -123,12 +124,56 @@ internal sealed class AudioRecorder : IAudioRecorder
             while ((read = _filteredSource.Read(buffer, 0, buffer.Length)) > 0)
             {
                 _writer.Write(buffer, 0, read);
+
+                if (AudioDataAvailable != null)
+                {
+                    float[] samples = ConvertBytesToFloatSamples(buffer, read, _filteredSource.WaveFormat);
+                    AudioDataAvailable?.Invoke(this, new AudioDataEventArgs(samples));
+                }
             }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Write error in DataAvailable: {ex.Message}");
         }
+    }
+
+    private float[] ConvertBytesToFloatSamples(byte[] buffer, int count, WaveFormat format)
+    {
+        int bytesPerSample = format.BitsPerSample / 8;
+        int sampleCount = count / bytesPerSample;
+        float[] samples = new float[sampleCount];
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            int byteIndex = i * bytesPerSample;
+
+            if (format.BitsPerSample == 16)
+            {
+                if (byteIndex + 1 < count)
+                {
+                    short sample = (short)(buffer[byteIndex] | (buffer[byteIndex + 1] << 8));
+                    samples[i] = sample / 32768f;
+                }
+            }
+            else if (format.BitsPerSample == 32 && format.WaveFormatTag == AudioEncoding.IeeeFloat)
+            {
+                if (byteIndex + 3 < count)
+                {
+                    samples[i] = BitConverter.ToSingle(buffer, byteIndex);
+                }
+            }
+            else if (format.BitsPerSample == 32)
+            {
+                if (byteIndex + 3 < count)
+                {
+                    int sample = BitConverter.ToInt32(buffer, byteIndex);
+                    samples[i] = sample / 2147483648f;
+                }
+            }
+        }
+
+        return samples;
     }
 
     public async Task StopRecordingAsync(CancellationToken cancellationToken = default)

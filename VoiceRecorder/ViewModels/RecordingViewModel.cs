@@ -6,8 +6,10 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using ReactiveUI;
+using VoiceRecorder.Controls;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
+using VoiceRecorder.Models;
 using VoiceRecorder.Services;
 using VoiceRecorder.Utils;
 
@@ -28,6 +30,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private string _statusMessage = "Ready";
     private string _filterTooltip = "Select an audio filter";
     private string _deviceTooltip = "Select a recording device";
+    private AudioVisualizerControl? _visualizer;
 
     public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
     public ObservableCollection<string> AvailableDevices { get; } = new();
@@ -89,6 +92,8 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         _deviceService = deviceService ?? new AudioDevice();
         _settingsService = settingsService ?? new SettingsService();
 
+        _recorder.AudioDataAvailable += OnAudioDataAvailable;
+
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
             new VoiceFilterViewModel(null),
@@ -119,6 +124,16 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             .DisposeWith(_disposables);
 
         RxApp.MainThreadScheduler.Schedule(async () => await LoadDevicesAsync());
+    }
+
+    public void SetVisualizer(AudioVisualizerControl visualizer)
+    {
+        _visualizer = visualizer;
+    }
+
+    private void OnAudioDataAvailable(object? sender, AudioDataEventArgs e)
+    {
+        _visualizer?.UpdateAudioData(e.Samples);
     }
 
     private async Task LoadDevicesAsync()
@@ -277,6 +292,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _recorder.AudioDataAvailable -= OnAudioDataAvailable;
         _timerSubscription?.Dispose();
         _disposables.Dispose();
         _recorder.Dispose();
