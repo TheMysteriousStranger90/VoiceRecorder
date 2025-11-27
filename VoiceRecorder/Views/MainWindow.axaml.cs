@@ -38,16 +38,16 @@ public partial class MainWindow : Window
         var styles = this.Styles;
         styles.Clear();
 
-        styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=VoiceRecorder"))
+        styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=AzioVoiceRecorder"))
         {
-            Source = new Uri("avares://VoiceRecorder/Styles/MainTheme.axaml")
+            Source = new Uri("avares://AzioVoiceRecorder/Styles/MainTheme.axaml")
         });
 
         if (theme == ThemeVariant.Second)
         {
-            styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=VoiceRecorder"))
+            styles.Add(new StyleInclude(new Uri("resm:Styles?assembly=AzioVoiceRecorder"))
             {
-                Source = new Uri("avares://VoiceRecorder/Styles/SecondTheme.axaml")
+                Source = new Uri("avares://AzioVoiceRecorder/Styles/SecondTheme.axaml")
             });
         }
     }

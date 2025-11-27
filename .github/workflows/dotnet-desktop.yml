@@ -13,7 +13,8 @@ env:
     DOTNET_VERSION: '9.0.x'
     SOLUTION_NAME: 'VoiceRecorder.sln'
     PROJECT_PATH: 'VoiceRecorder/VoiceRecorder.csproj'
-    ARTIFACT_NAME: 'VoiceRecorder'
+    ARTIFACT_NAME: 'AzioVoiceRecorder'
+    EXE_NAME: 'AzioVoiceRecorder.exe'
 
 jobs:
     # ============================================
@@ -90,7 +91,8 @@ jobs:
                   dotnet build ${{ env.SOLUTION_NAME }} `
                     --configuration ${{ matrix.configuration }} `
                     --no-restore `
-                    /p:ContinuousIntegrationBuild=true
+                    /p:ContinuousIntegrationBuild=true `
+                    /p:AssemblyName=AzioVoiceRecorder
 
             - name: Run Unit Tests
               if: matrix.configuration == 'Release'
@@ -145,7 +147,7 @@ jobs:
                   if ("${{ github.ref }}" -match "refs/tags/v(.*)") {
                     $version = $matches[1]
                   } else {
-                    $version = "1.3.0-dev.${{ github.run_number }}"
+                    $version = "1.3.1-dev.${{ github.run_number }}"
                   }
                   echo "version=$version" >> $env:GITHUB_OUTPUT
                   echo "Version: $version"
@@ -167,6 +169,7 @@ jobs:
                     /p:IncludeAllContentForSelfExtract=true `
                     /p:DebugType=embedded `
                     /p:DebugSymbols=true `
+                    /p:AssemblyName=AzioVoiceRecorder `
                     /p:Version=${{ steps.version.outputs.version }}
 
             - name: List published files
@@ -175,7 +178,7 @@ jobs:
             - name: Get file size
               id: filesize
               run: |
-                  $exePath = "./publish/win-x64/VoiceRecorder.exe"
+                  $exePath = "./publish/win-x64/${{ env.EXE_NAME }}"
                   if (Test-Path $exePath) {
                     $sizeBytes = (Get-Item $exePath).Length
                     $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
@@ -183,6 +186,7 @@ jobs:
                     echo "Executable size: $sizeMB MB"
                   } else {
                     echo "size_mb=Unknown" >> $env:GITHUB_OUTPUT
+                    Write-Warning "Executable not found at: $exePath"
                   }
 
             - name: Create ZIP archive
@@ -215,11 +219,12 @@ jobs:
             - name: Create build info
               run: |
                   $buildInfo = @"
-                  Build Information
-                  =================
+                  AzioVoice Recorder - Build Information
+                  ======================================
                   Version: ${{ steps.version.outputs.version }}
                   Configuration: Release (Hybrid - ReadyToRun without Trimming)
                   Runtime: win-x64 (self-contained)
+                  Executable: ${{ env.EXE_NAME }}
                   Executable Size: ${{ steps.filesize.outputs.size_mb }} MB
                   ZIP Size: ${{ steps.hash.outputs.zip_size_mb }} MB
                   SHA256: ${{ steps.hash.outputs.sha256 }}
@@ -230,9 +235,12 @@ jobs:
                   - ReadyToRun compilation for faster startup
                   - Full compatibility (no trimming issues)
                   - Compressed native libraries
+                  - Real-time audio visualization
+                  - Advanced audio filtering (Echo, Flanger, Distortion, Chorus, Compressor)
 
                   Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
                   Commit: ${{ github.sha }}
+                  Repository: ${{ github.repository }}
                   "@
 
                   $buildInfo | Out-File -FilePath ./publish/win-x64/BUILD_INFO.txt -Encoding utf8
@@ -269,32 +277,32 @@ jobs:
               run: |
                   $version = "${{ steps.version.outputs.version }}"
                   $notes = @"
-                  # Voice Recorder $version
+                  # AzioVoice Recorder $version
 
-                  ## 📦 Downloads
+                  ## Downloads
 
                   **Windows x64 (64-bit Intel/AMD)**
                   - Self-contained build (no .NET Runtime required)
                   - Single executable file with ReadyToRun compilation
                   - Optimized for fast startup without trimming issues
 
-                  ## 🚀 Installation
+                  ## Installation
 
-                  1. Download the ZIP file below
+                  1. Download the ``${{ env.ARTIFACT_NAME }}-$version-win-x64.zip`` file below
                   2. Extract to any folder
-                  3. Run ``VoiceRecorder.exe``
+                  3. Run ``${{ env.EXE_NAME }}``
                   4. (Optional) Grant microphone permissions in Windows Privacy Settings
 
-                  ## ✨ Features
+                  ## Features
 
-                  - Real-time audio recording with waveform visualization
-                  - Multiple audio formats support (WAV, MP3 with CSCore)
-                  - Built-in audio filters (Echo, Flanger, Distortion)
-                  - Device selection for recording
-                  - File explorer with playback controls
-                  - Modern Avalonia UI with Fluent theme
+                  - **Real-time audio recording** with live waveform visualization
+                  - **Built-in audio filters**: Echo, Flanger, Distortion, Chorus, Compressor
+                  - **Device selection** for recording from multiple microphones
+                  - **File explorer** with playback controls and audio management
+                  - **Modern Avalonia UI** with Fluent theme and smooth animations
+                  - **Configurable audio settings** (sample rate, bit depth, channels)
 
-                  ## 📋 Requirements
+                  ## Requirements
 
                   - **OS**: Windows 10 version 1809 or later / Windows 11
                   - **Architecture**: x64 (64-bit)
@@ -303,22 +311,31 @@ jobs:
                   - **RAM**: 256 MB minimum, 512 MB recommended
                   - **Microphone**: Required for recording
 
-                  ## ⚡ Performance
+                  ## Performance
 
                   This build uses **Hybrid approach**:
                   - ✅ ReadyToRun compilation for 30-40% faster startup
                   - ✅ No trimming = full compatibility with CSCore and audio libraries
                   - ✅ Optimized garbage collection (Server GC)
                   - ✅ Tiered compilation for runtime optimization
+                  - ✅ Embedded debug symbols for better diagnostics
 
                   ## 🔒 Security
 
-                  - **SHA256 Checksum**: Available in artifact details
+                  - **SHA256 Checksum**: Available in artifact details and BUILD_INFO.txt
                   - Verify the hash after download to ensure file integrity
+                  - No telemetry or data collection
+                  - All recordings stored locally
+
+                  ## 🐛 Known Issues
+
+                  - First-time microphone access may require Windows permissions
 
                   ---
 
-                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/v1.2.0...$version
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/v1.3.0...$version
+
+                  **Support**: For issues or questions, please visit [Issues](https://github.com/${{ github.repository }}/issues)
                   "@
 
                   $notes | Out-File -FilePath release_notes.md -Encoding utf8

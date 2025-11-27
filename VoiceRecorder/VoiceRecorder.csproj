@@ -1,6 +1,6 @@
 ﻿<!--
     Author: Bohdan Harabadzhyu
-    Description: This is a Voice Recorder.
+    Description: This is AzioVoice Recorder - A voice recording application.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
@@ -19,6 +19,10 @@
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <ApplicationIcon>./Assets/icon.ico</ApplicationIcon>
 
+        <!-- Assembly Naming -->
+        <AssemblyName>AzioVoiceRecorder</AssemblyName>
+        <RootNamespace>VoiceRecorder</RootNamespace>
+
         <!-- Version Info -->
         <AssemblyVersion>1.3.1.0</AssemblyVersion>
         <FileVersion>1.3.1.0</FileVersion>
@@ -28,7 +32,7 @@
         <Authors>Bohdan Harabadzhyu</Authors>
         <Company>Bohdan Harabadzhyu</Company>
         <Product>AzioVoice Recorder</Product>
-        <Description>A voice recording application with advanced audio filtering.</Description>
+        <Description>A voice recording application with advanced audio filtering and real-time visualization.</Description>
         <Copyright>Copyright © 2023 Bohdan Harabadzhyu</Copyright>
 
         <!-- Repository Info -->
