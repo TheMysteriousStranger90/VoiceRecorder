@@ -93,6 +93,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         _settingsService = settingsService ?? new SettingsService();
 
         _recorder.AudioDataAvailable += OnAudioDataAvailable;
+        _recorder.RecordingStarted += OnRecordingStarted;
 
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>
         {
@@ -203,31 +204,27 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 filePath,
                 SelectedFilterViewModel?.FilterStrategy,
                 settings);
+
             IsRecording = true;
             StatusMessage =
                 $"Recording: {Path.GetFileName(filePath)} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
-
-            _stopwatch.Restart();
-            TimerText = "00:00:00";
-
-            _timerSubscription?.Dispose();
-            _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
-                .ObserveOn(RxApp.MainThreadScheduler)
-                .Subscribe(_ =>
-                {
-                    TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-                });
         }
         catch (UnauthorizedAccessException)
         {
             StatusMessage = "Microphone access denied!";
             IsRecording = false;
+
+            _stopwatch.Stop();
+            _timerSubscription?.Dispose();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error: {ex.Message}";
             IsRecording = false;
             Debug.WriteLine($"Start error: {ex}");
+
+            _stopwatch.Stop();
+            _timerSubscription?.Dispose();
         }
     }
 
@@ -290,9 +287,27 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void OnRecordingStarted(object? sender, EventArgs e)
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            _stopwatch.Restart();
+            TimerText = "00:00:00";
+
+            _timerSubscription?.Dispose();
+            _timerSubscription = Observable.Interval(TimeSpan.FromSeconds(1))
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(_ =>
+                {
+                    TimerText = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+                });
+        });
+    }
+
     public void Dispose()
     {
         _recorder.AudioDataAvailable -= OnAudioDataAvailable;
+        _recorder.RecordingStarted -= OnRecordingStarted;
         _timerSubscription?.Dispose();
         _disposables.Dispose();
         _recorder.Dispose();

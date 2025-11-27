@@ -99,6 +99,7 @@ internal sealed class AudioRecorder : IAudioRecorder
 
             IsRecording = true;
             _capture.Start();
+
             RecordingStarted?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
