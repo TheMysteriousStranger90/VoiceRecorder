@@ -6,7 +6,6 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using ReactiveUI;
-using VoiceRecorder.Controls;
 using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
@@ -31,7 +30,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private string _statusMessage = "Ready";
     private string _filterTooltip = "Select an audio filter";
     private string _deviceTooltip = "Select a recording device";
-    private AudioVisualizerControl? _visualizer;
+    private float[] _audioSamples = [];
 
     public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
     public ObservableCollection<string> AvailableDevices { get; } = new();
@@ -86,6 +85,12 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _deviceTooltip, value);
     }
 
+    public float[] AudioSamples
+    {
+        get => _audioSamples;
+        private set => this.RaiseAndSetIfChanged(ref _audioSamples, value);
+    }
+
     public RecordingViewModel(IAudioRecorder? recorder = null, IAudioDevice? deviceService = null,
         ISettingsService? settingsService = null)
     {
@@ -128,14 +133,9 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         RxApp.MainThreadScheduler.Schedule(async () => await LoadDevicesAsync());
     }
 
-    public void SetVisualizer(AudioVisualizerControl visualizer)
-    {
-        _visualizer = visualizer;
-    }
-
     private void OnAudioDataAvailable(object? sender, AudioDataEventArgs e)
     {
-        _visualizer?.UpdateAudioData(e.Samples);
+        AudioSamples = e.Samples;
     }
 
     private async Task LoadDevicesAsync()

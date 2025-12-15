@@ -28,6 +28,17 @@ public class AudioVisualizerControl : TemplatedControl
             nameof(CornerRadius),
             new CornerRadius(0));
 
+    public static readonly StyledProperty<float[]?> AudioSamplesProperty =
+        AvaloniaProperty.Register<AudioVisualizerControl, float[]?>(
+            nameof(AudioSamples),
+            defaultValue: null);
+
+    public float[]? AudioSamples
+    {
+        get => GetValue(AudioSamplesProperty);
+        set => SetValue(AudioSamplesProperty, value);
+    }
+
     public new CornerRadius CornerRadius
     {
         get => GetValue(CornerRadiusProperty);
@@ -38,6 +49,12 @@ public class AudioVisualizerControl : TemplatedControl
     {
         get => GetValue(IsActiveProperty);
         set => SetValue(IsActiveProperty, value);
+    }
+
+    static AudioVisualizerControl()
+    {
+        AudioSamplesProperty.Changed.AddClassHandler<AudioVisualizerControl>(
+            (control, args) => control.OnAudioSamplesChanged(args));
     }
 
     public AudioVisualizerControl()
@@ -56,9 +73,17 @@ public class AudioVisualizerControl : TemplatedControl
         _timer.Start();
     }
 
-    public void UpdateAudioData(float[] samples)
+    private void OnAudioSamplesChanged(AvaloniaPropertyChangedEventArgs args)
     {
-        if (samples == null || samples.Length == 0) return;
+        if (args.NewValue is float[] samples)
+        {
+            ProcessAudioData(samples);
+        }
+    }
+
+    private void ProcessAudioData(float[] samples)
+    {
+        if (samples.Length == 0) return;
 
         lock (_dataLock)
         {
