@@ -1,6 +1,9 @@
-﻿using Avalonia;
+﻿using System.Runtime.Versioning;
+using Avalonia;
 using Avalonia.ReactiveUI;
 using VoiceRecorder.Services;
+
+[assembly: SupportedOSPlatform("windows")]
 
 namespace VoiceRecorder;
 
