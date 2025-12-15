@@ -40,7 +40,21 @@ internal sealed class AudioFileItem : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _size, value);
     }
 
-    public string FormattedSize => $"{(_size / 1024.0).ToString("F2", CultureInfo.InvariantCulture)} KB";
+    public string FormattedSize
+    {
+        get
+        {
+            const double bytesInMb = 1024.0 * 1024.0;
+            double sizeInMb = _size / bytesInMb;
+
+            if (sizeInMb < 0.1)
+            {
+                return $"{(_size / 1024.0).ToString("F2", CultureInfo.InvariantCulture)} KB";
+            }
+
+            return $"{sizeInMb.ToString("F2", CultureInfo.InvariantCulture)} MB";
+        }
+    }
 
     public TimeSpan Duration
     {
@@ -48,7 +62,17 @@ internal sealed class AudioFileItem : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _duration, value);
     }
 
-    public string FormattedDuration => _duration.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+    public string FormattedDuration
+    {
+        get
+        {
+            if (_duration.TotalHours >= 1)
+            {
+                return _duration.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+            }
+            return _duration.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+        }
+    }
 
     public AudioFileItem(string fullPath, string basePath)
     {

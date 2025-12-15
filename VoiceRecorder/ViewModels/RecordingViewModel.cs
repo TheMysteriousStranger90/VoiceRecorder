@@ -7,6 +7,7 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using ReactiveUI;
 using VoiceRecorder.Controls;
+using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
@@ -178,9 +179,14 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
             StatusMessage = "Ready to record";
         }
+        catch (AudioDeviceException ex)
+        {
+            StatusMessage = ex.Message;
+            Debug.WriteLine($"Audio device error: {ex.ErrorType} - {ex.Message}");
+        }
         catch (Exception ex)
         {
-            StatusMessage = $"Device error: {ex.Message}";
+            StatusMessage = $"Failed to initialize microphone: {ex.Message}";
             Debug.WriteLine($"Init error: {ex}");
         }
 
@@ -209,20 +215,32 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             StatusMessage =
                 $"Recording: {Path.GetFileName(filePath)} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
         }
+        catch (AudioDeviceException ex)
+        {
+            StatusMessage = ex.Message;
+            IsRecording = false;
+            _stopwatch.Stop();
+            _timerSubscription?.Dispose();
+        }
         catch (UnauthorizedAccessException)
         {
-            StatusMessage = "Microphone access denied!";
+            StatusMessage = "Microphone access denied! Please allow microphone access in Windows Privacy Settings.";
             IsRecording = false;
-
+            _stopwatch.Stop();
+            _timerSubscription?.Dispose();
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            IsRecording = false;
             _stopwatch.Stop();
             _timerSubscription?.Dispose();
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error: {ex.Message}";
+            StatusMessage = $"Recording error: {ex.Message}";
             IsRecording = false;
             Debug.WriteLine($"Start error: {ex}");
-
             _stopwatch.Stop();
             _timerSubscription?.Dispose();
         }

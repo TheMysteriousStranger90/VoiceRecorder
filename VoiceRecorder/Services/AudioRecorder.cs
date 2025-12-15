@@ -8,8 +8,7 @@ using VoiceRecorder.Exceptions;
 using VoiceRecorder.Filters.Interfaces;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
-
-namespace VoiceRecorder.Services;
+using VoiceRecorder.Models.Enums;
 
 internal sealed class AudioRecorder : IAudioRecorder
 {
@@ -34,6 +33,28 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             CleanupCapture();
 
+            if (device.DeviceState != DeviceState.Active)
+            {
+                var errorType = device.DeviceState switch
+                {
+                    DeviceState.Disabled => AudioDeviceErrorType.DeviceDisabled,
+                    DeviceState.NotPresent => AudioDeviceErrorType.DeviceNotFound,
+                    DeviceState.UnPlugged => AudioDeviceErrorType.DeviceNotFound,
+                    _ => AudioDeviceErrorType.Unknown
+                };
+
+                var userMessage = device.DeviceState switch
+                {
+                    DeviceState.Disabled =>
+                        $"Microphone '{device.FriendlyName}' is disabled. Please enable it in Windows Sound Settings.",
+                    DeviceState.NotPresent => $"Microphone '{device.FriendlyName}' is not connected.",
+                    DeviceState.UnPlugged => $"Microphone '{device.FriendlyName}' is unplugged.",
+                    _ => $"Microphone '{device.FriendlyName}' is not available (State: {device.DeviceState})."
+                };
+
+                throw new AudioDeviceException(errorType, userMessage);
+            }
+
             _capture = new WasapiCapture(false, AudioClientShareMode.Shared, 100)
             {
                 Device = device
@@ -44,16 +65,55 @@ internal sealed class AudioRecorder : IAudioRecorder
 
             _capture.DataAvailable += OnDataAvailable;
         }
+        catch (AudioDeviceException)
+        {
+            CleanupCapture();
+            throw;
+        }
+        catch (CoreAudioAPIException ex)
+        {
+            Debug.WriteLine($"CoreAudioAPI error initializing device: {ex.Message}, ErrorCode: {ex.ErrorCode}");
+            CleanupCapture();
+
+            var (errorType, userMessage) = ClassifyCoreAudioException(ex, device.FriendlyName);
+            throw new AudioDeviceException(errorType, userMessage, ex);
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"Error initializing device: {ex.Message}");
             CleanupCapture();
-            throw new AudioRecorderException("Failed to initialize device", ex);
+            throw new AudioDeviceException(
+                AudioDeviceErrorType.InitializationFailed,
+                $"Failed to initialize microphone '{device.FriendlyName}'. Please check if it's properly connected and enabled.",
+                ex);
         }
         finally
         {
             _deviceLock.Release();
         }
+    }
+
+    private static (AudioDeviceErrorType errorType, string message) ClassifyCoreAudioException(
+        CoreAudioAPIException ex, string deviceName)
+    {
+        return ex.ErrorCode switch
+        {
+            unchecked((int)0x88890004) => (
+                AudioDeviceErrorType.DeviceDisabled,
+                $"Microphone '{deviceName}' was disconnected or disabled. Please reconnect it and try again."),
+
+            unchecked((int)0x88890017) => (
+                AudioDeviceErrorType.DeviceInUse,
+                $"Microphone '{deviceName}' is being used by another application. Please close other apps using the microphone."),
+
+            unchecked((int)0x80070005) => (
+                AudioDeviceErrorType.AccessDenied,
+                $"Access to microphone '{deviceName}' was denied. Please check Windows Privacy Settings and allow microphone access."),
+
+            _ => (
+                AudioDeviceErrorType.InitializationFailed,
+                $"Failed to initialize microphone '{deviceName}'. Error: {ex.Message}")
+        };
     }
 
     public async Task StartRecordingAsync(string outputFilePath, IAudioFilter? filter,
@@ -101,6 +161,20 @@ internal sealed class AudioRecorder : IAudioRecorder
             _capture.Start();
 
             RecordingStarted?.Invoke(this, EventArgs.Empty);
+        }
+        catch (AudioDeviceException)
+        {
+            await StopRecordingInternalAsync().ConfigureAwait(false);
+            throw;
+        }
+        catch (AudioRecorderException)
+        {
+            await StopRecordingInternalAsync().ConfigureAwait(false);
+            throw;
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
