@@ -23,6 +23,8 @@ internal sealed class AudioPlayer : IAudioPlayer
     private readonly SemaphoreSlim _playbackLock = new(1, 1);
     private CancellationTokenSource? _playbackCts;
     private System.Threading.Timer? _progressTimer;
+    private bool _isWasapiWarmedUp;
+    private readonly object _warmupLock = new();
 
     public float Volume
     {
@@ -75,6 +77,44 @@ internal sealed class AudioPlayer : IAudioPlayer
     public event EventHandler<PlaybackStatusEventArgs>? PlaybackStatusChanged;
     public event EventHandler<PlaybackProgressEventArgs>? PlaybackProgressChanged;
 
+    public AudioPlayer()
+    {
+        Task.Run(WarmUpWasapiAsync);
+    }
+
+    private async Task WarmUpWasapiAsync()
+    {
+        try
+        {
+            lock (_warmupLock)
+            {
+                if (_isWasapiWarmedUp)
+                {
+                    return;
+                }
+            }
+
+            using var tempOut = new WasapiOut();
+
+            await Task.Delay(50).ConfigureAwait(false);
+
+            lock (_warmupLock)
+            {
+                _isWasapiWarmedUp = true;
+            }
+
+            Debug.WriteLine("WASAPI warmed up successfully");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"WASAPI warmup failed (non-critical): {ex.Message}");
+            lock (_warmupLock)
+            {
+                _isWasapiWarmedUp = true;
+            }
+        }
+    }
+
     public async Task PlayFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -89,16 +129,23 @@ internal sealed class AudioPlayer : IAudioPlayer
             try
             {
                 _currentFilePath = filePath;
+                var token = _playbackCts.Token;
 
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
                     _waveSource = CodecFactory.Instance.GetCodec(_currentFilePath);
-                    _soundOut = new WasapiOut();
+
+                    var wasapiOut = new WasapiOut { Latency = 100 };
+                    _soundOut = wasapiOut;
+
                     _soundOut.Stopped += OnPlaybackStopped;
                     _soundOut.Initialize(_waveSource);
                     _soundOut.Volume = _volume;
+
+                    await Task.Delay(50, token).ConfigureAwait(false);
+
                     _soundOut.Play();
-                }, _playbackCts.Token).ConfigureAwait(false);
+                }, token).ConfigureAwait(false);
 
                 _playbackState = PlaybackState.Playing;
 
@@ -276,14 +323,39 @@ internal sealed class AudioPlayer : IAudioPlayer
             if (_soundOut != null)
             {
                 _soundOut.Stopped -= OnPlaybackStopped;
-                _soundOut.Stop();
-                _soundOut.Dispose();
+
+                try
+                {
+                    _soundOut.Stop();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error stopping soundOut: {ex.Message}");
+                }
+
+                try
+                {
+                    _soundOut.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error disposing soundOut: {ex.Message}");
+                }
+
                 _soundOut = null;
             }
 
             if (_waveSource != null)
             {
-                _waveSource.Dispose();
+                try
+                {
+                    _waveSource.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error disposing waveSource: {ex.Message}");
+                }
+
                 _waveSource = null;
             }
         }, cancellationToken).ConfigureAwait(false);
@@ -308,7 +380,10 @@ internal sealed class AudioPlayer : IAudioPlayer
             return;
         }
 
-        await ((_playbackCts?.CancelAsync() ?? Task.CompletedTask).ConfigureAwait(false));
+        if (_playbackCts != null)
+        {
+            await _playbackCts.CancelAsync().ConfigureAwait(false);
+        }
 
         await StopInternalAsync(null, cancellationToken).ConfigureAwait(false);
     }
@@ -331,9 +406,19 @@ internal sealed class AudioPlayer : IAudioPlayer
         if (!_disposed)
         {
             StopProgressTimer();
-            StopFileAsync().GetAwaiter().GetResult();
+
+            try
+            {
+                StopFileAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error during dispose: {ex.Message}");
+            }
+
             _playbackCts?.Dispose();
             _playbackLock.Dispose();
+
             _disposed = true;
         }
     }

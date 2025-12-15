@@ -34,6 +34,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<ISettingsService, SettingsService>();
 
+        if (Program.SingleInstance != null)
+        {
+            services.AddSingleton(Program.SingleInstance);
+        }
+
         return services;
     }
 }

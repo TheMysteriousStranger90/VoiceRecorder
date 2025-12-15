@@ -29,7 +29,6 @@ internal sealed class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-
             desktop.Exit += OnExit;
         }
 
@@ -49,8 +48,6 @@ internal sealed class App : Application
             {
                 disposable.Dispose();
             }
-
-            System.Threading.Thread.Sleep(200);
         }
         catch (Exception ex)
         {
