@@ -178,21 +178,41 @@ internal sealed class AudioRecorder : IAudioRecorder
     {
         IWaveSource processedSource = source;
 
-        if (settings != null && settings.IsValid())
-        {
-            processedSource = processedSource
-                .ChangeSampleRate(settings.SampleRate)
-                .ToSampleSource()
-                .ToWaveSource(settings.BitsPerSample);
-
-            processedSource = settings.Channels == 1
-                ? processedSource.ToMono()
-                : processedSource.ToStereo();
-        }
-
         if (filter != null)
         {
-            processedSource = filter.ApplyFilter(processedSource);
+            try
+            {
+                var filterCompatibleSource = processedSource
+                    .ToSampleSource()
+                    .ToWaveSource(16)
+                    .ToStereo();
+
+                processedSource = filter.ApplyFilter(filterCompatibleSource);
+                Debug.WriteLine($"Filter applied: {filter.GetType().Name}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to apply filter: {ex.Message}. Continuing without filter.");
+            }
+        }
+
+        if (settings != null && settings.IsValid())
+        {
+            try
+            {
+                processedSource = processedSource.ChangeSampleRate(settings.SampleRate);
+                processedSource = processedSource.ToSampleSource().ToWaveSource(settings.BitsPerSample);
+                processedSource = settings.Channels == 1
+                    ? processedSource.ToMono()
+                    : processedSource.ToStereo();
+
+                Debug.WriteLine($"Applied settings: {settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to apply settings: {ex.Message}");
+                throw new AudioRecorderException($"Cannot apply audio settings: {ex.Message}", ex);
+            }
         }
 
         return processedSource;

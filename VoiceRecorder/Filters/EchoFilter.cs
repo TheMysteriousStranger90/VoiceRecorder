@@ -1,23 +1,18 @@
 ﻿using CSCore;
 using CSCore.Streams.Effects;
-using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-internal sealed class EchoFilter : IAudioFilter
+internal sealed class EchoFilter : DmoFilterBase
 {
-    public IWaveSource ApplyFilter(IWaveSource source)
+    protected override IWaveSource ApplyDmoEffect(IWaveSource source)
     {
-        ArgumentNullException.ThrowIfNull(source);
-
-        var echoEffect = new DmoEchoEffect(source)
+        return new DmoEchoEffect(source)
         {
             WetDryMix = 40f,
             Feedback = 35f,
             LeftDelay = 300f,
             RightDelay = 300f
         };
-
-        return echoEffect;
     }
 }

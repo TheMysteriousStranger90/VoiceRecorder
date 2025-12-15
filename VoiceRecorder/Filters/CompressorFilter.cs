@@ -1,16 +1,13 @@
 ﻿using CSCore;
 using CSCore.Streams.Effects;
-using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-internal sealed class CompressorFilter : IAudioFilter
+internal sealed class CompressorFilter : DmoFilterBase
 {
-    public IWaveSource ApplyFilter(IWaveSource source)
+    protected override IWaveSource ApplyDmoEffect(IWaveSource source)
     {
-        ArgumentNullException.ThrowIfNull(source);
-
-        var compressorEffect = new DmoCompressorEffect(source)
+        return new DmoCompressorEffect(source)
         {
             Gain = 5f,
             Attack = 5f,
@@ -19,7 +16,5 @@ internal sealed class CompressorFilter : IAudioFilter
             Ratio = 3f,
             Predelay = 2f
         };
-
-        return compressorEffect;
     }
 }

@@ -64,6 +64,43 @@
                 </StackPanel>
             </Border>
 
+            <!-- Filter Compatibility Info -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="⚠️ Audio Filters Compatibility"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="LightGray"
+                               FontSize="12">
+                        <Run Text="Audio filters (Echo, Flanger, Distortion, Chorus, Compressor) use DMO effects which work best with:" />
+                    </TextBlock>
+
+                    <StackPanel Spacing="8" Margin="10,0,0,0">
+                        <TextBlock Foreground="LightGray" FontSize="12">
+                            <Run Text="• Bits Per Sample: " /><Run Text="16-bit or 32-bit" FontWeight="SemiBold" Foreground="White" />
+                        </TextBlock>
+                        <TextBlock Foreground="LightGray" FontSize="12">
+                            <Run Text="• Channels: " /><Run Text="Stereo (2 channels)" FontWeight="SemiBold" Foreground="White" />
+                        </TextBlock>
+                        <TextBlock Foreground="LightGray" FontSize="12">
+                            <Run Text="• Sample Rate: " /><Run Text="44100 Hz or 48000 Hz" FontWeight="SemiBold" Foreground="White" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="Gray"
+                               FontSize="11"
+                               FontStyle="Italic"
+                               Margin="0,5,0,0"
+                               Text="Note: Using 8-bit or 24-bit with filters will automatically convert audio to 16-bit for processing, then back to your selected format." />
+                </StackPanel>
+            </Border>
+
             <!-- Theme Settings -->
             <Border Background="#303040"
                     CornerRadius="8"
@@ -114,9 +151,13 @@
                                FontSize="12">
                         <Run Text="• Higher sample rates provide better quality but larger file sizes" />
                         <LineBreak />
-                        <Run Text="• 44100 Hz is standard CD quality" />
+                        <Run Text="• 44100 Hz is standard CD quality, 48000 Hz is video/broadcast standard" />
                         <LineBreak />
                         <Run Text="• 16-bit is recommended for most recordings" />
+                        <LineBreak />
+                        <Run Text="• 24-bit provides higher dynamic range for professional use" />
+                        <LineBreak />
+                        <Run Text="• Mono (1 channel) halves file size compared to Stereo" />
                         <LineBreak />
                         <Run Text="• Changes will apply to new recordings" />
                     </TextBlock>

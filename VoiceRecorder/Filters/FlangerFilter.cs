@@ -1,16 +1,13 @@
 ﻿using CSCore;
 using CSCore.Streams.Effects;
-using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-internal sealed class FlangerFilter : IAudioFilter
+internal sealed class FlangerFilter : DmoFilterBase
 {
-    public IWaveSource ApplyFilter(IWaveSource source)
+    protected override IWaveSource ApplyDmoEffect(IWaveSource source)
     {
-        ArgumentNullException.ThrowIfNull(source);
-
-        var flangerEffect = new DmoFlangerEffect(source)
+        return new DmoFlangerEffect(source)
         {
             WetDryMix = 30f,
             Depth = 50f,
@@ -19,7 +16,5 @@ internal sealed class FlangerFilter : IAudioFilter
             Delay = 1.5f,
             Waveform = FlangerWaveform.Sin
         };
-
-        return flangerEffect;
     }
 }

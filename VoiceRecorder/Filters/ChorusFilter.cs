@@ -1,16 +1,13 @@
 ﻿using CSCore;
 using CSCore.Streams.Effects;
-using VoiceRecorder.Filters.Interfaces;
 
 namespace VoiceRecorder.Filters;
 
-internal sealed class ChorusFilter : IAudioFilter
+internal sealed class ChorusFilter : DmoFilterBase
 {
-    public IWaveSource ApplyFilter(IWaveSource source)
+    protected override IWaveSource ApplyDmoEffect(IWaveSource source)
     {
-        ArgumentNullException.ThrowIfNull(source);
-
-        var chorusEffect = new DmoChorusEffect(source)
+        return new DmoChorusEffect(source)
         {
             WetDryMix = 40f,
             Depth = 30f,
@@ -19,7 +16,5 @@ internal sealed class ChorusFilter : IAudioFilter
             Delay = 15f,
             Waveform = ChorusWaveform.WaveformSin
         };
-
-        return chorusEffect;
     }
 }
