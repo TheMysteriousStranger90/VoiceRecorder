@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using ReactiveUI;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Models.Events;
 using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;
@@ -26,6 +27,8 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
     private TimeSpan _totalDuration;
     private double _playbackProgress;
     private bool _isSeeking;
+
+    private static readonly string[] SupportedExtensions = ["*.wav", "*.mp3", "*.m4a", "*.aac", "*.flac"];
 
     public bool IsPlaying
     {
@@ -221,20 +224,34 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                         return (dirs, new List<AudioFileItem>());
 
                     var files = new List<AudioFileItem>();
-                    var wavFiles = Directory.GetFiles(basePath, "*.wav", SearchOption.AllDirectories);
 
-                    foreach (var file in wavFiles)
+                    foreach (var extension in SupportedExtensions)
                     {
                         if (cancellationToken.IsCancellationRequested)
                             break;
 
                         try
                         {
-                            files.Add(new AudioFileItem(file, basePath));
+                            var audioFiles = Directory.GetFiles(basePath, extension, SearchOption.AllDirectories);
+
+                            foreach (var file in audioFiles)
+                            {
+                                if (cancellationToken.IsCancellationRequested)
+                                    break;
+
+                                try
+                                {
+                                    files.Add(new AudioFileItem(file, basePath));
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"Error loading file info for {file}: {ex.Message}");
+                            Debug.WriteLine($"Error searching for {extension} files: {ex.Message}");
                         }
                     }
 
@@ -387,7 +404,9 @@ internal sealed class FileExplorerViewModel : ViewModelBase, IDisposable
                     UpdateStatus("Playback stopped.");
                     CurrentPosition = TimeSpan.Zero;
                     TotalDuration = TimeSpan.Zero;
-                    PlaybackProgress = 0;
+                    _playbackProgress = 0;
+                    this.RaisePropertyChanged(nameof(PlaybackProgress));
+                    this.RaisePropertyChanged(nameof(CurrentPositionText));
                     if (string.IsNullOrEmpty(e.FileName))
                     {
                         CurrentPlayingFile = string.Empty;

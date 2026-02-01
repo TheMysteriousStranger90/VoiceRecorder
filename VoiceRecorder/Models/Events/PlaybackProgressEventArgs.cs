@@ -1,6 +1,10 @@
-﻿namespace VoiceRecorder.Models;
+﻿using System.Diagnostics.CodeAnalysis;
 
-public class PlaybackProgressEventArgs : EventArgs
+namespace VoiceRecorder.Models.Events;
+
+[SuppressMessage("Design", "CA1515:Consider making public types internal",
+    Justification = "EventArgs used across assemblies")]
+public sealed class PlaybackProgressEventArgs : EventArgs
 {
     public TimeSpan Position { get; }
     public TimeSpan Duration { get; }

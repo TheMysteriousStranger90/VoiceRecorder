@@ -1,6 +1,6 @@
 ﻿namespace VoiceRecorder.Exceptions;
 
-public class AudioRecorderException : Exception
+internal sealed class AudioRecorderException : Exception
 {
     public AudioRecorderException()
     {

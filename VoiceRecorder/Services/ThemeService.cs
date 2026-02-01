@@ -1,4 +1,6 @@
 ﻿using VoiceRecorder.Interfaces;
+using VoiceRecorder.Models.Enums;
+using VoiceRecorder.Models.Events;
 
 namespace VoiceRecorder.Services;
 

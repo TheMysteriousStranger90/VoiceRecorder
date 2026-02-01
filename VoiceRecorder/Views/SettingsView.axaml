@@ -3,7 +3,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:VoiceRecorder.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             xmlns:models="using:VoiceRecorder.Models"
+             xmlns:enums="clr-namespace:VoiceRecorder.Models.Enums"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="800"
              x:Class="VoiceRecorder.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -21,6 +23,39 @@
                        Foreground="White"
                        HorizontalAlignment="Center"
                        Margin="0,0,0,20" />
+
+            <!-- Output Format Settings -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Output Format"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <!-- Output Format -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="File Format"
+                                   Foreground="LightGray" />
+                        <ComboBox ItemsSource="{Binding AvailableOutputFormats}"
+                                  SelectedItem="{Binding OutputFormat}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Output file format (WAV, MP3, AAC)" />
+                    </StackPanel>
+
+                    <!-- MP3 Bitrate (only visible when MP3 is selected) -->
+                    <StackPanel Spacing="5"
+                                IsVisible="{Binding OutputFormat, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static enums:OutputFormat.Mp3}}">
+                        <TextBlock Text="MP3 Bitrate (kbps)"
+                                   Foreground="LightGray" />
+                        <ComboBox ItemsSource="{Binding AvailableMp3Bitrates}"
+                                  SelectedItem="{Binding Mp3Bitrate}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="MP3 encoding bitrate" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
             <!-- Audio Format Settings -->
             <Border Background="#303040"
@@ -60,6 +95,57 @@
                                   SelectedItem="{Binding Channels}"
                                   HorizontalAlignment="Stretch"
                                   ToolTip.Tip="Number of audio channels (1=Mono, 2=Stereo)" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Audio Processing Settings -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Audio Processing"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <!-- Enable Noise Reduction -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ToggleSwitch IsChecked="{Binding EnableNoiseReduction}"
+                                      ToolTip.Tip="Enable noise reduction during recording" />
+                        <TextBlock Text="Enable Noise Reduction"
+                                   VerticalAlignment="Center"
+                                   Foreground="LightGray" />
+                    </StackPanel>
+
+                    <!-- Auto Gain Control -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ToggleSwitch IsChecked="{Binding AutoGainControl}"
+                                      ToolTip.Tip="Automatically adjust microphone gain" />
+                        <TextBlock Text="Auto Gain Control"
+                                   VerticalAlignment="Center"
+                                   Foreground="LightGray" />
+                    </StackPanel>
+
+                    <!-- Noise Gate Threshold -->
+                    <StackPanel Spacing="5">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="Noise Gate Threshold:"
+                                       Foreground="LightGray"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding NoiseGateThresholdText}"
+                                       Foreground="White"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Slider Value="{Binding NoiseGateThreshold}"
+                                Minimum="-80"
+                                Maximum="0"
+                                ToolTip.Tip="Audio below this level will be silenced" />
+                        <TextBlock Text="Lower values = more sensitive (keeps quieter sounds)"
+                                   Foreground="Gray"
+                                   FontSize="11"
+                                   FontStyle="Italic" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -112,11 +198,11 @@
                                Foreground="White" />
 
                     <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ToggleSwitch IsChecked="{Binding IsLightTheme}"
+                                      ToolTip.Tip="Toggle between main and second theme" />
                         <TextBlock Text="Second Theme"
                                    VerticalAlignment="Center"
                                    Foreground="LightGray" />
-                        <ToggleSwitch IsChecked="{Binding IsLightTheme}"
-                                      ToolTip.Tip="Toggle between main and second theme" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -149,13 +235,17 @@
                     <TextBlock TextWrapping="Wrap"
                                Foreground="LightGray"
                                FontSize="12">
+                        <Run Text="• WAV: Uncompressed, best quality, largest files" />
+                        <LineBreak />
+                        <Run Text="• MP3: Good compression, compatible everywhere" />
+                        <LineBreak />
+                        <Run Text="• AAC: Better quality than MP3 at same bitrate" />
+                        <LineBreak />
                         <Run Text="• Higher sample rates provide better quality but larger file sizes" />
                         <LineBreak />
                         <Run Text="• 44100 Hz is standard CD quality, 48000 Hz is video/broadcast standard" />
                         <LineBreak />
                         <Run Text="• 16-bit is recommended for most recordings" />
-                        <LineBreak />
-                        <Run Text="• 24-bit provides higher dynamic range for professional use" />
                         <LineBreak />
                         <Run Text="• Mono (1 channel) halves file size compared to Stereo" />
                         <LineBreak />

@@ -1,6 +1,6 @@
 ﻿namespace VoiceRecorder.Exceptions;
 
-public class UnsupportedCodecException : Exception
+internal sealed class UnsupportedCodecException : Exception
 {
     public UnsupportedCodecException()
     {

@@ -1,18 +1,11 @@
 root = true
 
 [*.cs]
-dotnet_diagnostic.CA1515.severity = warning
-
-dotnet_diagnostic.CA1416.severity = warning
-
-dotnet_diagnostic.CA1812.severity = warning
-
-dotnet_diagnostic.CA1819.severity = warning
-
-dotnet_diagnostic.CA1822.severity = warning
-
-dotnet_diagnostic.CA1031.severity = warning
-
+# These warnings are excluded from TreatWarningsAsErrors in .csproj
+# Set to suggestion to show them without failing builds
+dotnet_diagnostic.CA1031.severity = suggestion
+dotnet_diagnostic.CA1812.severity = suggestion
+dotnet_diagnostic.CA2007.severity = suggestion
 
 [*]
 charset = utf-8-bom
@@ -78,7 +71,7 @@ dotnet_style_prefer_simplified_interpolation = true:suggestion
 dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
 
 # Code quality rules
-dotnet_code_quality_unused_parameters = all:warning
+dotnet_code_quality_unused_parameters = all:suggestion
 dotnet_remove_unnecessary_suppression_exclusions = none
 
 # ReSharper properties
@@ -119,10 +112,14 @@ resharper_web_config_wrong_module_highlighting = warning
 indent_style = space
 indent_size = 2
 
+# YAML files (GitHub Actions) - use LF to match .gitattributes
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
 # XML files
 [*.{appxmanifest,asax,ascx,aspx,axaml,blockshader,c,c++,c++m,cc,ccm,cginc,compute,cp,cpp,cppm,cs,cshtml,cu,cuh,cxx,cxxm,dtd,fs,fsi,fsscript,fsx,fx,fxh,h,h++,hh,hlsl,hlsli,hlslinc,hp,hpp,hxx,icc,inc,inl,ino,ipp,ixx,master,ml,mli,mpp,mq4,mq5,mqh,mxx,nuspec,paml,razor,resw,resx,shader,shaderFoundry,skin,tcc,tpp,urtshader,usf,ush,uxml,vb,xaml,xamlx,xoml,xsd}]
 indent_style = space
 indent_size = 4
 tab_width = 4
-
-

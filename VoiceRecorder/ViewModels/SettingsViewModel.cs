@@ -3,6 +3,8 @@ using System.Windows.Input;
 using ReactiveUI;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Models.Enums;
+using VoiceRecorder.Models.Events;
 using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;
@@ -16,10 +18,17 @@ internal sealed class SettingsViewModel : ViewModelBase
     private int _channels;
     private bool _isLightTheme;
     private string _statusMessage = string.Empty;
+    private OutputFormat _outputFormat;
+    private int _mp3Bitrate;
+    private bool _enableNoiseReduction;
+    private bool _autoGainControl;
+    private float _noiseGateThreshold;
 
     public ObservableCollection<int> AvailableSampleRates { get; }
     public ObservableCollection<int> AvailableBitsPerSample { get; }
     public ObservableCollection<int> AvailableChannels { get; }
+    public ObservableCollection<OutputFormat> AvailableOutputFormats { get; }
+    public ObservableCollection<int> AvailableMp3Bitrates { get; }
 
     public int SampleRate
     {
@@ -51,6 +60,39 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _statusMessage, value);
     }
 
+    public OutputFormat OutputFormat
+    {
+        get => _outputFormat;
+        set => this.RaiseAndSetIfChanged(ref _outputFormat, value);
+    }
+
+    public int Mp3Bitrate
+    {
+        get => _mp3Bitrate;
+        set => this.RaiseAndSetIfChanged(ref _mp3Bitrate, value);
+    }
+
+    public bool EnableNoiseReduction
+    {
+        get => _enableNoiseReduction;
+        set => this.RaiseAndSetIfChanged(ref _enableNoiseReduction, value);
+    }
+
+    public bool AutoGainControl
+    {
+        get => _autoGainControl;
+        set => this.RaiseAndSetIfChanged(ref _autoGainControl, value);
+    }
+
+    public float NoiseGateThreshold
+    {
+        get => _noiseGateThreshold;
+        set => this.RaiseAndSetIfChanged(ref _noiseGateThreshold, value);
+    }
+
+    // Computed property for display
+    public string NoiseGateThresholdText => $"{NoiseGateThreshold:F0} dB";
+
     public ICommand SaveSettingsCommand { get; }
     public ICommand ResetSettingsCommand { get; }
 
@@ -61,16 +103,32 @@ internal sealed class SettingsViewModel : ViewModelBase
         _settingsService = settingsService ?? new SettingsService();
         _themeService = themeService ?? new ThemeService();
 
-        AvailableSampleRates = new ObservableCollection<int>
-        {
+        AvailableSampleRates =
+        [
             8000, 11025, 16000, 22050, 44100, 48000, 96000, 192000
-        };
+        ];
 
-        AvailableBitsPerSample = new ObservableCollection<int> { 8, 16, 24, 32 };
-        AvailableChannels = new ObservableCollection<int> { 1, 2 };
+        AvailableBitsPerSample = [8, 16, 24, 32];
+        AvailableChannels = [1, 2];
+
+        AvailableOutputFormats =
+        [
+            OutputFormat.Wav,
+            OutputFormat.Mp3,
+            OutputFormat.Aac
+        ];
+
+        AvailableMp3Bitrates =
+        [
+            64, 96, 128, 160, 192, 224, 256, 320
+        ];
 
         SaveSettingsCommand = ReactiveCommand.Create(SaveSettings);
         ResetSettingsCommand = ReactiveCommand.Create(ResetSettings);
+
+        // Subscribe to NoiseGateThreshold changes to update display text
+        this.WhenAnyValue(x => x.NoiseGateThreshold)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(NoiseGateThresholdText)));
 
         LoadSettings();
     }
@@ -82,6 +140,11 @@ internal sealed class SettingsViewModel : ViewModelBase
         BitsPerSample = settings.BitsPerSample;
         Channels = settings.Channels;
         IsLightTheme = settings.Theme == ThemeVariant.Second;
+        OutputFormat = settings.OutputFormat;
+        Mp3Bitrate = settings.Mp3Bitrate;
+        EnableNoiseReduction = settings.EnableNoiseReduction;
+        AutoGainControl = settings.AutoGainControl;
+        NoiseGateThreshold = settings.NoiseGateThreshold;
 
         _themeService.SetTheme(settings.Theme);
 
@@ -95,7 +158,12 @@ internal sealed class SettingsViewModel : ViewModelBase
             SampleRate = SampleRate,
             BitsPerSample = BitsPerSample,
             Channels = Channels,
-            Theme = IsLightTheme ? ThemeVariant.Second : ThemeVariant.Main
+            Theme = IsLightTheme ? ThemeVariant.Second : ThemeVariant.Main,
+            OutputFormat = OutputFormat,
+            Mp3Bitrate = Mp3Bitrate,
+            EnableNoiseReduction = EnableNoiseReduction,
+            AutoGainControl = AutoGainControl,
+            NoiseGateThreshold = NoiseGateThreshold
         };
 
         if (!settings.IsValid())
@@ -117,6 +185,11 @@ internal sealed class SettingsViewModel : ViewModelBase
         BitsPerSample = defaultSettings.BitsPerSample;
         Channels = defaultSettings.Channels;
         IsLightTheme = defaultSettings.Theme == ThemeVariant.Second;
+        OutputFormat = defaultSettings.OutputFormat;
+        Mp3Bitrate = defaultSettings.Mp3Bitrate;
+        EnableNoiseReduction = defaultSettings.EnableNoiseReduction;
+        AutoGainControl = defaultSettings.AutoGainControl;
+        NoiseGateThreshold = defaultSettings.NoiseGateThreshold;
 
         UpdateStatus("Settings reset to default");
     }

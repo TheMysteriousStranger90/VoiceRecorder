@@ -6,25 +6,8 @@ using VoiceRecorder.Views;
 
 namespace VoiceRecorder.Extensions;
 
-public static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddViewModels(this IServiceCollection services)
-    {
-        services.AddTransient<MainWindowViewModel>();
-        services.AddTransient<RecordingViewModel>();
-        services.AddTransient<FileExplorerViewModel>();
-        services.AddTransient<SettingsViewModel>();
-
-        return services;
-    }
-
-    public static IServiceCollection AddViews(this IServiceCollection services)
-    {
-        services.AddSingleton<MainWindow>();
-
-        return services;
-    }
-
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddTransient<IAudioDevice, AudioDevice>();
@@ -38,6 +21,23 @@ public static class ServiceCollectionExtensions
         {
             services.AddSingleton(Program.SingleInstance);
         }
+
+        return services;
+    }
+
+    public static IServiceCollection AddViewModels(this IServiceCollection services)
+    {
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<RecordingViewModel>();
+        services.AddTransient<FileExplorerViewModel>();
+        services.AddTransient<SettingsViewModel>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddViews(this IServiceCollection services)
+    {
+        services.AddSingleton<MainWindow>();
 
         return services;
     }

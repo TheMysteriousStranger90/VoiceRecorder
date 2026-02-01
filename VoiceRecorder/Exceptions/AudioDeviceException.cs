@@ -2,7 +2,7 @@
 
 namespace VoiceRecorder.Exceptions;
 
-public class AudioDeviceException : Exception
+internal sealed class AudioDeviceException : Exception
 {
     public AudioDeviceErrorType ErrorType { get; }
 

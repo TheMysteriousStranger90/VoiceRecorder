@@ -7,7 +7,7 @@ using VoiceRecorder.Models;
 
 namespace VoiceRecorder.Converters;
 
-public class PlayingFileConverter : IValueConverter
+internal sealed class PlayingFileConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

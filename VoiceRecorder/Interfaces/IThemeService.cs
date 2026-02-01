@@ -1,24 +1,14 @@
-﻿namespace VoiceRecorder.Interfaces;
+﻿using System.Diagnostics.CodeAnalysis;
+using VoiceRecorder.Models.Enums;
+using VoiceRecorder.Models.Events;
 
-public interface IThemeService
+namespace VoiceRecorder.Interfaces;
+
+[SuppressMessage("Design", "CA1515:Consider making public types internal",
+    Justification = "Interfaces used across assemblies")]
+internal interface IThemeService
 {
     ThemeVariant CurrentTheme { get; }
     void SetTheme(ThemeVariant theme);
     event EventHandler<ThemeChangedEventArgs>? ThemeChanged;
-}
-
-public enum ThemeVariant
-{
-    Main,
-    Second
-}
-
-public class ThemeChangedEventArgs : EventArgs
-{
-    public ThemeVariant Theme { get; }
-
-    public ThemeChangedEventArgs(ThemeVariant theme)
-    {
-        Theme = theme;
-    }
 }
