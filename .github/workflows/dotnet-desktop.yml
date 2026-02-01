@@ -314,20 +314,20 @@ jobs:
                   ## Performance
 
                   This build uses **Hybrid approach**:
-                  - ✅ ReadyToRun compilation for 30-40% faster startup
-                  - ✅ No trimming = full compatibility with CSCore and audio libraries
-                  - ✅ Optimized garbage collection (Server GC)
-                  - ✅ Tiered compilation for runtime optimization
-                  - ✅ Embedded debug symbols for better diagnostics
+                  - ReadyToRun compilation for 30-40% faster startup
+                  - No trimming = full compatibility with CSCore and audio libraries
+                  - Optimized garbage collection (Server GC)
+                  - Tiered compilation for runtime optimization
+                  - Embedded debug symbols for better diagnostics
 
-                  ## 🔒 Security
+                  ## Security
 
                   - **SHA256 Checksum**: Available in artifact details and BUILD_INFO.txt
                   - Verify the hash after download to ensure file integrity
                   - No telemetry or data collection
                   - All recordings stored locally
 
-                  ## 🐛 Known Issues
+                  ## Known Issues
 
                   - First-time microphone access may require Windows permissions
 

@@ -25,9 +25,9 @@
         <RootNamespace>VoiceRecorder</RootNamespace>
 
         <!-- Version Info -->
-        <AssemblyVersion>1.4.0.0</AssemblyVersion>
-        <FileVersion>1.4.0.0</FileVersion>
-        <InformationalVersion>1.4.0</InformationalVersion>
+        <AssemblyVersion>1.5.0.0</AssemblyVersion>
+        <FileVersion>1.5.0.0</FileVersion>
+        <InformationalVersion>1.5.0</InformationalVersion>
 
         <!-- Product Info -->
         <Authors>Bohdan Harabadzhyu</Authors>
@@ -70,7 +70,7 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 
         <!-- Warning Configuration -->
-        <WarningsNotAsErrors>CA1031;CA1812;CA2007;CA2227</WarningsNotAsErrors>
+        <WarningsNotAsErrors>CA1031;CA1812;CA2007</WarningsNotAsErrors>
 
         <!-- Language Features -->
         <LangVersion>latest</LangVersion>
