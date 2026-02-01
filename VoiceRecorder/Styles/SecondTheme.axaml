@@ -30,6 +30,11 @@
         <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="15,8"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0.2"/>
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="Button:pointerover">
@@ -50,9 +55,25 @@
         <Setter Property="Opacity" Value="0.5"/>
     </Style>
 
+    <!-- Icon Button Style -->
+    <Style Selector="Button.iconButton">
+        <Setter Property="Background" Value="#333333"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="#444444"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <Style Selector="Button.iconButton:pointerover">
+        <Setter Property="Background" Value="#404040"/>
+        <Setter Property="BorderBrush" Value="#8800FF"/>
+        <Setter Property="RenderTransform" Value="scale(1.1)"/>
+    </Style>
+
     <Style Selector="Button.navButton">
         <Setter Property="Background" Value="#333333"/>
-        <Setter Property="Foreground" Value="#E5E5E5"/> <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="#E5E5E5"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="#444444"/>
         <Setter Property="Padding" Value="12"/>
         <Setter Property="Margin" Value="4"/>
@@ -70,6 +91,31 @@
         <Setter Property="RenderTransform" Value="scale(0.95)"/>
     </Style>
 
+    <!-- Filter Panel -->
+    <Style Selector="Border.filterPanel">
+        <Setter Property="Background" Value="#2C2C2C"/>
+        <Setter Property="BorderBrush" Value="#8800FF"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
+    <!-- Device Panel -->
+    <Style Selector="Border.devicePanel">
+        <Setter Property="Background" Value="#2C2C2C"/>
+        <Setter Property="BorderBrush" Value="#8800FF"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
+    <!-- Filter/Device ListBox -->
+    <Style Selector="ListBox.filterList, ListBox.deviceList">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
     <Style Selector="ListBox">
         <Setter Property="Background" Value="#2C2C2C"/>
         <Setter Property="Foreground" Value="#E5E5E5"/>
@@ -80,12 +126,18 @@
     </Style>
 
     <Style Selector="ListBoxItem">
-        <Setter Property="Padding" Value="12,10"/>
-        <Setter Property="Margin" Value="0,4"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="Background" Value="#333333"/>
         <Setter Property="BorderBrush" Value="#444444"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0.2"/>
+                <BrushTransition Property="Background" Duration="0.15"/>
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="ListBoxItem:pointerover">
@@ -114,17 +166,82 @@
         </Setter>
     </Style>
 
-    <Style Selector="ListBoxItem TextBlock">
+    <!-- Filter Indicator -->
+    <Style Selector="Ellipse.filterIndicator">
+        <Setter Property="Fill">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#8800FF"/>
+                <GradientStop Offset="1" Color="#CC66FF"/>
+            </LinearGradientBrush>
+        </Setter>
+    </Style>
+
+    <Style Selector="Ellipse.filterIndicatorEmpty">
+        <Setter Property="Fill" Value="Transparent"/>
+        <Setter Property="Stroke" Value="#666"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+    </Style>
+
+    <!-- Device Indicator -->
+    <Style Selector="Ellipse.deviceIndicator">
+        <Setter Property="Fill" Value="#4CAF50"/>
+    </Style>
+
+    <!-- Filter Name -->
+    <Style Selector="TextBlock.filterName">
         <Setter Property="Foreground" Value="#E5E5E5"/>
         <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="13"/>
     </Style>
 
-    <Style Selector="ListBoxItem:selected TextBlock">
+    <Style Selector="ListBoxItem:selected TextBlock.filterName">
         <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
-    <Style Selector="ListBoxItem:selected:pointerover TextBlock">
+    <!-- Filter Description -->
+    <Style Selector="TextBlock.filterDescription">
+        <Setter Property="Foreground" Value="#AAAAAA"/>
+        <Setter Property="FontSize" Value="10"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.filterDescription">
+        <Setter Property="Foreground" Value="#EEEEEE"/>
+    </Style>
+
+    <!-- Device Name -->
+    <Style Selector="TextBlock.deviceName">
+        <Setter Property="Foreground" Value="#E5E5E5"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.deviceName">
         <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Device Info -->
+    <Style Selector="TextBlock.deviceInfo">
+        <Setter Property="Foreground" Value="#AAAAAA"/>
+        <Setter Property="FontSize" Value="10"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.deviceInfo">
+        <Setter Property="Foreground" Value="#EEEEEE"/>
+    </Style>
+
+    <!-- Default Badge -->
+    <Style Selector="Border.defaultBadge">
+        <Setter Property="Background" Value="#4CAF50"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="6,2"/>
+    </Style>
+
+    <Style Selector="TextBlock.badgeText">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontSize" Value="9"/>
+        <Setter Property="FontWeight" Value="Bold"/>
     </Style>
 
     <Style Selector="Label">
@@ -143,7 +260,8 @@
         <Setter Property="BorderBrush" Value="#444444"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="BoxShadow" Value="0 2 12 0 #30000000"/> </Style>
+        <Setter Property="BoxShadow" Value="0 2 12 0 #30000000"/>
+    </Style>
 
     <Style Selector="Label#TimerLabel">
         <Setter Property="FontSize" Value="18"/>
@@ -184,25 +302,6 @@
             </Transitions>
         </Setter>
     </Style>
-
-    <Style Selector="Slider">
-        <Setter Property="Foreground" Value="#8800FF"/> </Style>
-
-    <Style Selector="Slider:pointerover /template/ Thumb">
-        <Setter Property="Background" Value="#AA00FF"/>
-    </Style>
-
-    <Style Selector="PathIcon">
-        <Setter Property="Foreground" Value="#E5E5E5"/> </Style>
-
-    <Style Selector="Button PathIcon">
-        <Setter Property="Foreground" Value="#FFFFFF"/> </Style>
-
-    <Style Selector="Button.navButton PathIcon">
-        <Setter Property="Foreground" Value="#8800FF"/> </Style>
-
-    <Style Selector="Button.navButton:pointerover PathIcon">
-        <Setter Property="Foreground" Value="#AA00FF"/> </Style>
 
     <Style Selector="ScrollViewer">
         <Setter Property="Background" Value="Transparent"/>
@@ -248,5 +347,29 @@
     <Style Selector="Border.statusBar TextBlock">
         <Setter Property="Foreground" Value="#FFFFFF"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="PathIcon">
+        <Setter Property="Foreground" Value="#E5E5E5"/>
+    </Style>
+
+    <Style Selector="Button PathIcon">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.navButton PathIcon">
+        <Setter Property="Foreground" Value="#8800FF"/>
+    </Style>
+
+    <Style Selector="Button.navButton:pointerover PathIcon">
+        <Setter Property="Foreground" Value="#AA00FF"/>
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="Foreground" Value="#8800FF"/>
+    </Style>
+
+    <Style Selector="Slider:pointerover /template/ Thumb">
+        <Setter Property="Background" Value="#AA00FF"/>
     </Style>
 </Styles>

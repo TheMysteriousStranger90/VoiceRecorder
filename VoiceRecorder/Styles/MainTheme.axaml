@@ -8,9 +8,10 @@
             <Color x:Key="PrimaryColor">#80F</Color>
             <Color x:Key="SecondaryColor">#214</Color>
             <Color x:Key="AccentColor">#F0F</Color>
+            <Color x:Key="PanelBackground">#1A1A2E</Color>
+            <Color x:Key="ItemBackground">#252540</Color>
         </Style.Resources>
     </Style>
-
 
     <Style Selector="controls|AudioVisualizerControl">
         <Setter Property="Template">
@@ -74,6 +75,56 @@
         <Setter Property="RenderTransform" Value="scale(0.95)"/>
     </Style>
 
+    <!-- Icon Button Style -->
+    <Style Selector="Button.iconButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Opacity" Value="0.7"/>
+    </Style>
+
+    <Style Selector="Button.iconButton:pointerover">
+        <Setter Property="Background" Value="#80F"/>
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="RenderTransform" Value="scale(1.1)"/>
+    </Style>
+
+    <!-- Filter Panel -->
+    <Style Selector="Border.filterPanel">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#1A1A2E"/>
+                <GradientStop Offset="1" Color="#0D0D1A"/>
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="BorderBrush" Value="#80F"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
+    <!-- Device Panel -->
+    <Style Selector="Border.devicePanel">
+        <Setter Property="Background">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#1A1A2E"/>
+                <GradientStop Offset="1" Color="#0D0D1A"/>
+            </LinearGradientBrush>
+        </Setter>
+        <Setter Property="BorderBrush" Value="#80F"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
+    <!-- Filter/Device ListBox -->
+    <Style Selector="ListBox.filterList, ListBox.deviceList">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+
     <!-- ListBox Styles -->
     <Style Selector="ListBox">
         <Setter Property="Background">
@@ -94,18 +145,20 @@
 
     <Style Selector="ListBoxItem">
         <Setter Property="Padding" Value="8"/>
-        <Setter Property="Margin" Value="0,2"/>
-        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Background" Value="#252540"/>
         <Setter Property="Transitions">
             <Transitions>
                 <TransformOperationsTransition Property="RenderTransform" Duration="0.2"/>
+                <BrushTransition Property="Background" Duration="0.15"/>
             </Transitions>
         </Setter>
     </Style>
 
     <Style Selector="ListBoxItem:pointerover">
-        <Setter Property="Background" Value="#80F"/>
-        <Setter Property="RenderTransform" Value="scale(1.02)"/>
+        <Setter Property="Background" Value="#353560"/>
+        <Setter Property="RenderTransform" Value="scale(1.01)"/>
     </Style>
 
     <Style Selector="ListBoxItem:selected">
@@ -117,6 +170,95 @@
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected:pointerover">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#90F"/>
+                    <GradientStop Offset="1" Color="#B0F"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Filter Indicator -->
+    <Style Selector="Ellipse.filterIndicator">
+        <Setter Property="Fill">
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Offset="0" Color="#80F"/>
+                <GradientStop Offset="1" Color="#F0F"/>
+            </LinearGradientBrush>
+        </Setter>
+    </Style>
+
+    <Style Selector="Ellipse.filterIndicatorEmpty">
+        <Setter Property="Fill" Value="Transparent"/>
+        <Setter Property="Stroke" Value="#555"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+    </Style>
+
+    <!-- Device Indicator -->
+    <Style Selector="Ellipse.deviceIndicator">
+        <Setter Property="Fill" Value="#4CAF50"/>
+    </Style>
+
+    <!-- Filter Name -->
+    <Style Selector="TextBlock.filterName">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.filterName">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Filter Description -->
+    <Style Selector="TextBlock.filterDescription">
+        <Setter Property="Foreground" Value="#888"/>
+        <Setter Property="FontSize" Value="10"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.filterDescription">
+        <Setter Property="Foreground" Value="#DDD"/>
+    </Style>
+
+    <!-- Device Name -->
+    <Style Selector="TextBlock.deviceName">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.deviceName">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Device Info -->
+    <Style Selector="TextBlock.deviceInfo">
+        <Setter Property="Foreground" Value="#888"/>
+        <Setter Property="FontSize" Value="10"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected TextBlock.deviceInfo">
+        <Setter Property="Foreground" Value="#DDD"/>
+    </Style>
+
+    <!-- Default Badge -->
+    <Style Selector="Border.defaultBadge">
+        <Setter Property="Background" Value="#4CAF50"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="6,2"/>
+    </Style>
+
+    <Style Selector="TextBlock.badgeText">
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontSize" Value="9"/>
+        <Setter Property="FontWeight" Value="Bold"/>
     </Style>
 
     <!-- Label Styles -->
@@ -139,22 +281,6 @@
         <Setter Property="Transitions">
             <Transitions>
             </Transitions>
-        </Setter>
-    </Style>
-
-    <!-- AudioVisualizer Control Style -->
-    <Style Selector="controls|AudioVisualizerControl">
-        <Setter Property="Margin" Value="0,10"/>
-        <Setter Property="Height" Value="100"/>
-        <Setter Property="ClipToBounds" Value="True"/>
-        <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="Background">
-            <Setter.Value>
-                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                    <GradientStop Offset="0" Color="#214"/>
-                    <GradientStop Offset="1" Color="#103"/>
-                </LinearGradientBrush>
-            </Setter.Value>
         </Setter>
     </Style>
 
@@ -219,5 +345,10 @@
 
     <Style Selector="Button.navButton:pointerover">
         <Setter Property="Background" Value="#80F"/>
+    </Style>
+
+    <!-- ScrollViewer -->
+    <Style Selector="ScrollViewer">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
 </Styles>
