@@ -8,7 +8,6 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
 using VoiceRecorder.Exceptions;
-using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
 using VoiceRecorder.Models.Events;
@@ -82,7 +81,11 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     public VoiceFilterViewModel SelectedFilterViewModel
     {
         get => _selectedFilterViewModel;
-        set => this.RaiseAndSetIfChanged(ref _selectedFilterViewModel, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedFilterViewModel, value);
+            UpdateFilterTooltip();
+        }
     }
 
     public string SelectedDevice
@@ -162,15 +165,10 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             audioDevice.DefaultDeviceChanged += OnDefaultDeviceChanged;
         }
 
-        AvailableFilters =
-        [
-            new VoiceFilterViewModel(null),
-            new VoiceFilterViewModel(new EchoFilter()),
-            new VoiceFilterViewModel(new FlangerFilter()),
-            new VoiceFilterViewModel(new DistortionFilter()),
-            new VoiceFilterViewModel(new ChorusFilter()),
-            new VoiceFilterViewModel(new CompressorFilter()),
-        ];
+        // Load all available filters from VoiceFilterViewModel
+        AvailableFilters = new ObservableCollection<VoiceFilterViewModel>(
+            VoiceFilterViewModel.GetAvailableFilters());
+
         _selectedFilterViewModel = AvailableFilters[0];
 
         var canStartRecording = this.WhenAnyValue(
@@ -335,8 +333,13 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                 IsRecording = true;
                 IsPaused = false;
                 RecordingSize = "0 KB";
+
+                var filterInfo = SelectedFilterViewModel?.FilterStrategy != null
+                    ? $" with {SelectedFilterViewModel.DisplayName}"
+                    : string.Empty;
+
                 StatusMessage =
-                    $"Recording: {Path.GetFileName(filePath)} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
+                    $"Recording: {Path.GetFileName(filePath)}{filterInfo} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
             });
         }
         catch (AudioDeviceException ex)
@@ -502,8 +505,24 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            FilterTooltip = "Select an audio filter";
+            UpdateFilterTooltip();
             DeviceTooltip = "Select a recording device";
+        }
+    }
+
+    private void UpdateFilterTooltip()
+    {
+        if (_isRecording)
+        {
+            FilterTooltip = "Cannot change filter during recording";
+        }
+        else if (_selectedFilterViewModel?.FilterStrategy != null)
+        {
+            FilterTooltip = $"{_selectedFilterViewModel.DisplayName}: {_selectedFilterViewModel.Description}";
+        }
+        else
+        {
+            FilterTooltip = "No audio effect applied";
         }
     }
 
