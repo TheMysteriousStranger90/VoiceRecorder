@@ -21,10 +21,8 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly IAudioRecorder _recorder;
     private readonly IAudioDevice _deviceService;
-    private readonly Stopwatch _stopwatch = new();
     private readonly CompositeDisposable _disposables = new();
     private IDisposable? _timerSubscription;
-    private System.Threading.Timer? _displayTimer;
     private string _timerText = "00:00:00";
     private bool _isRecording;
     private bool _isPaused;
@@ -157,7 +155,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         _recorder.AudioLevelChanged += OnAudioLevelChanged;
         _recorder.RecordingProgressChanged += OnRecordingProgressChanged;
 
-        // Subscribe to device changes
         if (_deviceService is AudioDevice audioDevice)
         {
             audioDevice.DeviceChanged += OnDeviceChanged;
@@ -165,7 +162,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             audioDevice.DefaultDeviceChanged += OnDefaultDeviceChanged;
         }
 
-        // Load all available filters from VoiceFilterViewModel
         AvailableFilters = new ObservableCollection<VoiceFilterViewModel>(
             VoiceFilterViewModel.GetAvailableFilters());
 
@@ -231,7 +227,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
             if (IsRecording)
             {
-                // Check if current device was removed
                 var isAvailable = await _deviceService.IsDeviceAvailableAsync(SelectedDevice).ConfigureAwait(false);
                 if (!isAvailable)
                 {
@@ -265,7 +260,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
                     AvailableDevicesInfo.Add(device);
                 }
 
-                // Select default device if available
                 var defaultDevice = devicesInfo.FirstOrDefault(d => d.IsDefault);
                 if (defaultDevice != null)
                 {
@@ -375,8 +369,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsPaused = true;
-                StopDisplayTimer();
-                _stopwatch.Stop();
                 StatusMessage = "Recording paused";
             });
         }
@@ -396,8 +388,6 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsPaused = false;
-                _stopwatch.Start();
-                StartDisplayTimer();
                 StatusMessage = "Recording resumed";
             });
         }
@@ -415,8 +405,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             StatusMessage = message;
             IsRecording = false;
             IsPaused = false;
-            StopDisplayTimer();
-            _stopwatch.Stop();
+            StopTimerSubscription();
         });
     }
 
@@ -431,8 +420,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                StopTimerSubscription();
                 IsRecording = false;
                 IsPaused = false;
                 PeakLevel = 0;
@@ -446,8 +434,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             {
                 IsRecording = false;
                 IsPaused = false;
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                StopTimerSubscription();
                 StatusMessage = "Recording stopped";
             });
         }
@@ -459,8 +446,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             {
                 IsRecording = false;
                 IsPaused = false;
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                StopTimerSubscription();
                 StatusMessage = $"Error saving recording: {ex.Message}";
             });
         }
@@ -530,48 +516,41 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            _stopwatch.Restart();
             TimerText = "00:00:00";
-            StartDisplayTimer();
+            StartTimerSubscription();
         });
     }
 
-    private void StartDisplayTimer()
+    private void StartTimerSubscription()
     {
-        StopDisplayTimer();
+        StopTimerSubscription();
 
-        _displayTimer = new System.Threading.Timer(
-            callback: _ => UpdateTimerDisplay(),
-            state: null,
-            dueTime: TimeSpan.Zero,
-            period: TimeSpan.FromMilliseconds(500));
+        _timerSubscription = Observable
+            .Interval(TimeSpan.FromMilliseconds(100))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => UpdateTimerFromRecorder());
     }
 
-    private void StopDisplayTimer()
+    private void StopTimerSubscription()
     {
-        _displayTimer?.Dispose();
-        _displayTimer = null;
         _timerSubscription?.Dispose();
         _timerSubscription = null;
     }
 
-    private void UpdateTimerDisplay()
+    private void UpdateTimerFromRecorder()
     {
-        if (!_stopwatch.IsRunning)
+        if (!IsRecording || IsPaused)
         {
             return;
         }
 
-        var elapsed = _stopwatch.Elapsed;
+        var elapsed = _recorder.RecordingDuration;
         var text = elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
 
-        Dispatcher.UIThread.Post(() =>
+        if (TimerText != text)
         {
-            if (IsRecording && !IsPaused)
-            {
-                TimerText = text;
-            }
-        });
+            TimerText = text;
+        }
     }
 
     public void Dispose()
@@ -588,7 +567,7 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             audioDevice.DefaultDeviceChanged -= OnDefaultDeviceChanged;
         }
 
-        StopDisplayTimer();
+        StopTimerSubscription();
         _disposables.Dispose();
         _recorder.Dispose();
         GC.SuppressFinalize(this);
