@@ -90,7 +90,6 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _noiseGateThreshold, value);
     }
 
-    // Computed property for display
     public string NoiseGateThresholdText => $"{NoiseGateThreshold:F0} dB";
 
     public ICommand SaveSettingsCommand { get; }
@@ -114,8 +113,8 @@ internal sealed class SettingsViewModel : ViewModelBase
         AvailableOutputFormats =
         [
             OutputFormat.Wav,
-            OutputFormat.Mp3,
-            OutputFormat.Aac
+            //OutputFormat.Mp3,
+            //OutputFormat.Aac
         ];
 
         AvailableMp3Bitrates =
@@ -126,7 +125,6 @@ internal sealed class SettingsViewModel : ViewModelBase
         SaveSettingsCommand = ReactiveCommand.Create(SaveSettings);
         ResetSettingsCommand = ReactiveCommand.Create(ResetSettings);
 
-        // Subscribe to NoiseGateThreshold changes to update display text
         this.WhenAnyValue(x => x.NoiseGateThreshold)
             .Subscribe(_ => this.RaisePropertyChanged(nameof(NoiseGateThresholdText)));
 

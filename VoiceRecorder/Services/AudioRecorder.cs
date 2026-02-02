@@ -147,7 +147,9 @@ internal sealed class AudioRecorder : IAudioRecorder
 
             _soundInSource = new SoundInSource(_capture) { FillWithZeros = false };
 
-            _processedSource = BuildProcessingChain(_soundInSource, filter, settings);
+            OutputFormat outputFormat = GetOutputFormatFromPath(outputFilePath);
+
+            _processedSource = BuildProcessingChain(_soundInSource, filter, settings, outputFormat);
 
             int bufferSize = CalculateOptimalBufferSize(_processedSource.WaveFormat);
             _readBuffer = new byte[bufferSize];
@@ -156,7 +158,7 @@ internal sealed class AudioRecorder : IAudioRecorder
             _preRollBuffer = new byte[preRollBufferSize];
             _preRollBytesWritten = 0;
 
-            _writerDisposable = CreateWriter(outputFilePath, _processedSource.WaveFormat) as IDisposable;
+            _writerDisposable = CreateWriter(outputFilePath, _processedSource.WaveFormat, outputFormat) as IDisposable;
 
             if (filter != null)
             {
@@ -224,6 +226,18 @@ internal sealed class AudioRecorder : IAudioRecorder
         {
             _recordingLock.Release();
         }
+    }
+
+    private static OutputFormat GetOutputFormatFromPath(string filePath)
+    {
+        string extension = Path.GetExtension(filePath).ToUpperInvariant();
+        return extension switch
+        {
+            ".MP3" => OutputFormat.Mp3,
+            ".AAC" or ".M4A" => OutputFormat.Aac,
+            ".WAV" => OutputFormat.Wav,
+            _ => OutputFormat.Wav
+        };
     }
 
     private async Task WaitForCaptureReadyAsync(CancellationToken cancellationToken)
@@ -315,18 +329,15 @@ internal sealed class AudioRecorder : IAudioRecorder
         return Math.Clamp(bufferSize, 4096, 65536);
     }
 
-    private static IWriteable CreateWriter(string filePath, WaveFormat format)
+    private static IWriteable CreateWriter(string filePath, WaveFormat format, OutputFormat outputFormat)
     {
-        string extension = Path.GetExtension(filePath).ToUpperInvariant();
-
         try
         {
-            return extension switch
+            return outputFormat switch
             {
-                ".WAV" => new WaveWriter(filePath, format),
-                ".MP3" => CreateMp3Encoder(filePath, format),
-                ".AAC" or ".M4A" => CreateAacEncoder(filePath, format),
-                ".FLAC" => throw new NotSupportedException("FLAC encoding is not supported in this version."),
+                OutputFormat.Wav => new WaveWriter(filePath, format),
+                OutputFormat.Mp3 => CreateMp3Encoder(filePath, format),
+                OutputFormat.Aac => CreateAacEncoder(filePath, format),
                 _ => new WaveWriter(filePath, format)
             };
         }
@@ -340,13 +351,45 @@ internal sealed class AudioRecorder : IAudioRecorder
     {
         try
         {
+            var supportedFormats = MediaFoundationEncoder.GetEncoderMediaTypes(AudioSubTypes.MpegLayer3);
+
+            if (supportedFormats.Length == 0)
+            {
+                throw new NotSupportedException(
+                    "MP3 encoding is not supported on this system. " +
+                    "Please install Windows Media Feature Pack or use WAV format.");
+            }
+
+            bool isFormatSupported = supportedFormats.Any(f =>
+                f.SampleRate == format.SampleRate &&
+                f.Channels == format.Channels);
+
+            if (!isFormatSupported)
+            {
+                var supportedList = string.Join(", ",
+                    supportedFormats.Select(f => $"{f.SampleRate}Hz/{f.Channels}ch").Distinct());
+
+                throw new NotSupportedException(
+                    $"MP3 encoder does not support {format.SampleRate}Hz with {format.Channels} channels. " +
+                    $"Supported combinations: {supportedList}. " +
+                    $"This should have been converted automatically - please report this issue.");
+            }
+
             var encoder = MediaFoundationEncoder.CreateMP3Encoder(format, filePath, 192000);
+            Debug.WriteLine(
+                $"MP3 encoder created successfully: {format.SampleRate}Hz, {format.Channels}ch, {format.BitsPerSample}bit");
             return encoder;
+        }
+        catch (NotSupportedException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"MP3 encoder creation failed: {ex.Message}");
-            throw new NotSupportedException("MP3 encoding is not supported on this system.", ex);
+            throw new NotSupportedException(
+                "Failed to create MP3 encoder. Your system may not support MP3 encoding. " +
+                "Please use WAV format instead.", ex);
         }
     }
 
@@ -354,13 +397,45 @@ internal sealed class AudioRecorder : IAudioRecorder
     {
         try
         {
+            var supportedFormats = MediaFoundationEncoder.GetEncoderMediaTypes(AudioSubTypes.MPEG_ADTS_AAC);
+
+            if (supportedFormats.Length == 0)
+            {
+                throw new NotSupportedException(
+                    "AAC encoding is not supported on this system. " +
+                    "Please install Windows Media Feature Pack or use WAV format.");
+            }
+
+            bool isFormatSupported = supportedFormats.Any(f =>
+                f.SampleRate == format.SampleRate &&
+                f.Channels == format.Channels);
+
+            if (!isFormatSupported)
+            {
+                var supportedList = string.Join(", ",
+                    supportedFormats.Select(f => $"{f.SampleRate}Hz/{f.Channels}ch").Distinct());
+
+                throw new NotSupportedException(
+                    $"AAC encoder does not support {format.SampleRate}Hz with {format.Channels} channels. " +
+                    $"Supported combinations: {supportedList}. " +
+                    $"This should have been converted automatically - please report this issue.");
+            }
+
             var encoder = MediaFoundationEncoder.CreateAACEncoder(format, filePath, 192000);
+            Debug.WriteLine(
+                $"AAC encoder created successfully: {format.SampleRate}Hz, {format.Channels}ch, {format.BitsPerSample}bit");
             return encoder;
+        }
+        catch (NotSupportedException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"AAC encoder creation failed: {ex.Message}");
-            throw new NotSupportedException("AAC encoding is not supported on this system.", ex);
+            throw new NotSupportedException(
+                "Failed to create AAC encoder. Your system may not support AAC encoding. " +
+                "Please use WAV format instead.", ex);
         }
     }
 
@@ -383,7 +458,11 @@ internal sealed class AudioRecorder : IAudioRecorder
         }
     }
 
-    private static IWaveSource BuildProcessingChain(SoundInSource source, IAudioFilter? filter, AudioSettings? settings)
+    private static IWaveSource BuildProcessingChain(
+        SoundInSource source,
+        IAudioFilter? filter,
+        AudioSettings? settings,
+        OutputFormat outputFormat)
     {
         IWaveSource processedSource = source;
 
@@ -425,7 +504,82 @@ internal sealed class AudioRecorder : IAudioRecorder
             }
         }
 
+        if (outputFormat == OutputFormat.Mp3 || outputFormat == OutputFormat.Aac)
+        {
+            processedSource = PrepareSourceForCompressedEncoder(processedSource, outputFormat);
+        }
+
         return processedSource;
+    }
+
+    private static IWaveSource PrepareSourceForCompressedEncoder(IWaveSource source, OutputFormat outputFormat)
+    {
+        var audioSubType = outputFormat == OutputFormat.Mp3
+            ? AudioSubTypes.MpegLayer3
+            : AudioSubTypes.MPEG_ADTS_AAC;
+
+        try
+        {
+            var supportedFormats = MediaFoundationEncoder.GetEncoderMediaTypes(audioSubType);
+
+            if (supportedFormats.Length == 0)
+            {
+                throw new NotSupportedException(
+                    $"{outputFormat} encoding is not supported on this system.");
+            }
+
+            var currentFormat = source.WaveFormat;
+            Debug.WriteLine(
+                $"Current format before encoder preparation: {currentFormat.SampleRate}Hz, {currentFormat.Channels}ch, {currentFormat.BitsPerSample}bit");
+
+            bool isFormatSupported = supportedFormats.Any(f =>
+                f.SampleRate == currentFormat.SampleRate &&
+                f.Channels == currentFormat.Channels);
+
+            if (isFormatSupported && currentFormat.BitsPerSample == 16)
+            {
+                Debug.WriteLine("Format is already compatible with encoder");
+                return source;
+            }
+
+            var targetFormat = supportedFormats
+                .Where(f => f.Channels == currentFormat.Channels)
+                .OrderBy(f => Math.Abs(f.SampleRate - currentFormat.SampleRate))
+                .FirstOrDefault();
+
+            if (targetFormat == null)
+            {
+                targetFormat = supportedFormats
+                    .OrderBy(f => Math.Abs(f.SampleRate - currentFormat.SampleRate))
+                    .First();
+
+                Debug.WriteLine($"Converting channels: {currentFormat.Channels} -> {targetFormat.Channels}");
+                source = targetFormat.Channels == 1 ? source.ToMono() : source.ToStereo();
+            }
+
+            if (currentFormat.SampleRate != targetFormat.SampleRate)
+            {
+                Debug.WriteLine($"Converting sample rate: {currentFormat.SampleRate}Hz -> {targetFormat.SampleRate}Hz");
+                source = source.ChangeSampleRate(targetFormat.SampleRate);
+            }
+
+            if (currentFormat.BitsPerSample != 16)
+            {
+                Debug.WriteLine($"Converting bit depth: {currentFormat.BitsPerSample}bit -> 16bit");
+                source = source.ToSampleSource().ToWaveSource(16);
+            }
+
+            Debug.WriteLine(
+                $"Format prepared for {outputFormat} encoder: {source.WaveFormat.SampleRate}Hz, {source.WaveFormat.Channels}ch, {source.WaveFormat.BitsPerSample}bit");
+            return source;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error preparing source for encoder: {ex.Message}");
+            throw new AudioRecorderException(
+                $"Failed to prepare audio format for {outputFormat} encoding. " +
+                $"Your system may not support this format.", ex);
+        }
     }
 
     private void OnDataAvailable(object? sender, DataAvailableEventArgs e)
