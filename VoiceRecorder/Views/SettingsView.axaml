@@ -99,6 +99,42 @@
                 </StackPanel>
             </Border>
 
+            <!-- Theme Settings -->
+            <Border Background="#303040"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="Appearance"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ToggleSwitch IsChecked="{Binding IsLightTheme}"
+                                      ToolTip.Tip="Toggle between main and second theme" />
+                        <TextBlock Text="Second Theme"
+                                   VerticalAlignment="Center"
+                                   Foreground="LightGray" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="10"
+                        Margin="0,10,0,0">
+                <Button Command="{Binding SaveSettingsCommand}"
+                        Content="Save Settings"
+                        Padding="20,10"
+                        ToolTip.Tip="Save current settings" />
+
+                <Button Command="{Binding ResetSettingsCommand}"
+                        Content="Reset to Default"
+                        Padding="20,10"
+                        ToolTip.Tip="Reset all settings to default values" />
+            </StackPanel>
+
             <!-- Filter Compatibility Info -->
             <Border Background="#303040"
                     CornerRadius="8"
@@ -136,68 +172,24 @@
                                FontStyle="Italic"
                                Margin="0,5,0,0"
                                Text="Note: Using 8-bit or 24-bit with filters will automatically convert audio to 16-bit for processing, then back to your selected format." />
-                </StackPanel>
-            </Border>
-
-            <!-- Theme Settings -->
-            <Border Background="#303040"
-                    CornerRadius="8"
-                    Padding="20">
-                <StackPanel Spacing="15">
-                    <TextBlock Text="Appearance"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="White" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ToggleSwitch IsChecked="{Binding IsLightTheme}"
-                                      ToolTip.Tip="Toggle between main and second theme" />
-                        <TextBlock Text="Second Theme"
-                                   VerticalAlignment="Center"
-                                   Foreground="LightGray" />
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Information"
+                                   FontWeight="SemiBold"
+                                   Foreground="White" />
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="LightGray"
+                                   FontSize="12">
+                            <Run Text="• 44100 Hz is standard CD quality, 48000 Hz is video/broadcast standard" />
+                            <LineBreak />
+                            <Run Text="• 16-bit is recommended for most recordings" />
+                            <LineBreak />
+                            <Run Text="• Mono (1 channel) halves file size compared to Stereo" />
+                            <LineBreak />
+                            <Run Text="• Changes will apply to new recordings" />
+                        </TextBlock>
                     </StackPanel>
                 </StackPanel>
             </Border>
-
-            <!-- Action Buttons -->
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        Spacing="10"
-                        Margin="0,10,0,0">
-                <Button Command="{Binding SaveSettingsCommand}"
-                        Content="Save Settings"
-                        Padding="20,10"
-                        ToolTip.Tip="Save current settings" />
-
-                <Button Command="{Binding ResetSettingsCommand}"
-                        Content="Reset to Default"
-                        Padding="20,10"
-                        ToolTip.Tip="Reset all settings to default values" />
-            </StackPanel>
-
-            <!-- Info Panel -->
-            <Border Background="#404050"
-                    CornerRadius="8"
-                    Padding="15"
-                    Margin="0,10,0,0">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Information"
-                               FontWeight="SemiBold"
-                               Foreground="White" />
-                    <TextBlock TextWrapping="Wrap"
-                               Foreground="LightGray"
-                               FontSize="12">
-                        <Run Text="• 44100 Hz is standard CD quality, 48000 Hz is video/broadcast standard" />
-                        <LineBreak />
-                        <Run Text="• 16-bit is recommended for most recordings" />
-                        <LineBreak />
-                        <Run Text="• Mono (1 channel) halves file size compared to Stereo" />
-                        <LineBreak />
-                        <Run Text="• Changes will apply to new recordings" />
-                    </TextBlock>
-                </StackPanel>
-            </Border>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

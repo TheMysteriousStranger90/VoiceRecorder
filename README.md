@@ -21,14 +21,45 @@ AzioVoice Recorder is a modern application for Windows that provides audio recor
 * **Customizable Settings:** Configure sample rate, bit depth, and channel count
 
 ### Audio Filters
-Choose from multiple professional-grade audio filters:
+Choose from over 20 professional-grade audio filters and effects:
 
-* **Echo:** Add depth and ambiance to recordings
-* **Flanger:** Create sweeping, whooshing effects
-* **Distortion:** Add grit and saturation
-* **Chorus:** Enrich recordings with layered sounds
-* **Compressor:** Balance audio levels dynamically
-* **No Filter:** Pure, unprocessed audio capture
+**Reverb Effects:**
+* **Small Room:** Intimate room acoustics for natural sound
+* **Large Hall:** Spacious concert hall ambiance
+* **Cathedral:** Church-like acoustics with very long decay
+
+**Echo Effects:**
+* **Subtle Echo:** Slight repetition for depth
+* **Slapback Echo:** Rockabilly-style quick echo
+* **Long Echo:** Spacey, extended delay effect
+
+**Chorus Effects:**
+* **Rich Chorus:** Thick, lush layered sound
+* **Subtle Chorus:** Light vocal enhancement
+
+**Flanger Effects:**
+* **Jet Flanger:** Classic sweeping, whooshing sound
+* **Gentle Flanger:** Subtle movement and texture
+
+**Distortion Effects:**
+* **Warm Distortion:** Adds analog warmth and character
+* **Heavy Distortion:** Aggressive edge and saturation
+
+**Compressor Effects:**
+* **Voice Compressor:** Optimized for vocals and podcasts
+* **Gentle Compression:** Subtle dynamic leveling
+* **Broadcast Compressor:** Professional radio broadcast style
+
+**Special Effects:**
+* **Robot Voice:** Robotic modulation effect
+* **Tremolo:** Classic amplitude modulation
+
+**Effect Chains (Combined Effects):**
+* **Professional Vocal:** Compression + subtle reverb for polished recordings
+* **Atmospheric:** Chorus + reverb + echo for ethereal soundscapes
+* **Vintage Radio:** Warm distortion + compression for retro broadcast sound
+
+* **None:** Pure, unprocessed audio capture
 
 ### User Interface
 * **Dual Theme Support:** Switch between Main (dark) and Second (light) themes
