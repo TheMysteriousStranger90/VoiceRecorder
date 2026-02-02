@@ -599,7 +599,8 @@ internal sealed class AudioRecorder : IAudioRecorder
                     samples[i] = sample24 / 8388608f;
                     break;
 
-                case 32 when format.WaveFormatTag == AudioEncoding.IeeeFloat && byteIndex + 3 < count:
+                case 32 when (format.WaveFormatTag == AudioEncoding.IeeeFloat ||
+                              format.WaveFormatTag == AudioEncoding.Extensible) && byteIndex + 3 < count:
                     samples[i] = BitConverter.ToSingle(buffer, byteIndex);
                     break;
 
