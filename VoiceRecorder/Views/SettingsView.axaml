@@ -99,63 +99,12 @@
                 </StackPanel>
             </Border>
 
-            <!-- Audio Processing Settings -->
-            <Border Background="#303040"
-                    CornerRadius="8"
-                    Padding="20">
-                <StackPanel Spacing="15">
-                    <TextBlock Text="Audio Processing"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="White" />
-
-                    <!-- Enable Noise Reduction -->
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ToggleSwitch IsChecked="{Binding EnableNoiseReduction}"
-                                      ToolTip.Tip="Enable noise reduction during recording" />
-                        <TextBlock Text="Enable Noise Reduction"
-                                   VerticalAlignment="Center"
-                                   Foreground="LightGray" />
-                    </StackPanel>
-
-                    <!-- Auto Gain Control -->
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ToggleSwitch IsChecked="{Binding AutoGainControl}"
-                                      ToolTip.Tip="Automatically adjust microphone gain" />
-                        <TextBlock Text="Auto Gain Control"
-                                   VerticalAlignment="Center"
-                                   Foreground="LightGray" />
-                    </StackPanel>
-
-                    <!-- Noise Gate Threshold -->
-                    <StackPanel Spacing="5">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="Noise Gate Threshold:"
-                                       Foreground="LightGray"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding NoiseGateThresholdText}"
-                                       Foreground="White"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Slider Value="{Binding NoiseGateThreshold}"
-                                Minimum="-80"
-                                Maximum="0"
-                                ToolTip.Tip="Audio below this level will be silenced" />
-                        <TextBlock Text="Lower values = more sensitive (keeps quieter sounds)"
-                                   Foreground="Gray"
-                                   FontSize="11"
-                                   FontStyle="Italic" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
             <!-- Filter Compatibility Info -->
             <Border Background="#303040"
                     CornerRadius="8"
                     Padding="20">
                 <StackPanel Spacing="15">
-                    <TextBlock Text="⚠️ Audio Filters Compatibility"
+                    <TextBlock Text="Audio Filters Compatibility"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="White" />
@@ -163,18 +112,21 @@
                     <TextBlock TextWrapping="Wrap"
                                Foreground="LightGray"
                                FontSize="12">
-                        <Run Text="Audio filters (Echo, Flanger, Distortion, Chorus, Compressor) use DMO effects which work best with:" />
+                        <Run Text="Audio filters use DMO effects which work best with:" />
                     </TextBlock>
 
                     <StackPanel Spacing="8" Margin="10,0,0,0">
                         <TextBlock Foreground="LightGray" FontSize="12">
-                            <Run Text="• Bits Per Sample: " /><Run Text="16-bit or 32-bit" FontWeight="SemiBold" Foreground="White" />
+                            <Run Text="• Bits Per Sample: " />
+                            <Run Text="16-bit or 32-bit" FontWeight="SemiBold" Foreground="White" />
                         </TextBlock>
                         <TextBlock Foreground="LightGray" FontSize="12">
-                            <Run Text="• Channels: " /><Run Text="Stereo (2 channels)" FontWeight="SemiBold" Foreground="White" />
+                            <Run Text="• Channels: " />
+                            <Run Text="Stereo (2 channels)" FontWeight="SemiBold" Foreground="White" />
                         </TextBlock>
                         <TextBlock Foreground="LightGray" FontSize="12">
-                            <Run Text="• Sample Rate: " /><Run Text="44100 Hz or 48000 Hz" FontWeight="SemiBold" Foreground="White" />
+                            <Run Text="• Sample Rate: " />
+                            <Run Text="44100 Hz or 48000 Hz" FontWeight="SemiBold" Foreground="White" />
                         </TextBlock>
                     </StackPanel>
 
@@ -229,20 +181,12 @@
                     Padding="15"
                     Margin="0,10,0,0">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="ℹ️ Information"
+                    <TextBlock Text="Information"
                                FontWeight="SemiBold"
                                Foreground="White" />
                     <TextBlock TextWrapping="Wrap"
                                Foreground="LightGray"
                                FontSize="12">
-                        <Run Text="• WAV: Uncompressed, best quality, largest files" />
-                        <LineBreak />
-                        <Run Text="• MP3: Good compression, compatible everywhere" />
-                        <LineBreak />
-                        <Run Text="• AAC: Better quality than MP3 at same bitrate" />
-                        <LineBreak />
-                        <Run Text="• Higher sample rates provide better quality but larger file sizes" />
-                        <LineBreak />
                         <Run Text="• 44100 Hz is standard CD quality, 48000 Hz is video/broadcast standard" />
                         <LineBreak />
                         <Run Text="• 16-bit is recommended for most recordings" />
