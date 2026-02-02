@@ -5,7 +5,7 @@ using Avalonia.Threading;
 
 namespace VoiceRecorder.Controls;
 
-public class AudioVisualizerControl : TemplatedControl
+internal sealed class AudioVisualizerControl : TemplatedControl
 {
     private readonly List<double> _barHeights;
     private readonly DispatcherTimer _timer;

@@ -3,8 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 using CSCore;
 using CSCore.Codecs;
 using CSCore.SoundOut;
+using CSCore.Streams.Effects;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Models.Events;
 using PlaybackState = VoiceRecorder.Models.PlaybackState;
 
 namespace VoiceRecorder.Services;
@@ -12,6 +14,8 @@ namespace VoiceRecorder.Services;
 internal sealed class AudioPlayer : IAudioPlayer
 {
     private IWaveSource? _waveSource;
+    private ISampleSource? _sampleSource;
+    private Equalizer? _equalizer;
 
     [SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance")]
     private ISoundOut? _soundOut;
@@ -25,6 +29,9 @@ internal sealed class AudioPlayer : IAudioPlayer
     private System.Threading.Timer? _progressTimer;
     private bool _isWasapiWarmedUp;
     private readonly object _warmupLock = new();
+
+    private readonly float[] _equalizerBands = new float[10];
+    private static readonly int[] BandFrequencies = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
     public float Volume
     {
@@ -74,12 +81,49 @@ internal sealed class AudioPlayer : IAudioPlayer
         }
     }
 
+    public IReadOnlyList<int> EqualizerFrequencies => BandFrequencies;
+
     public event EventHandler<PlaybackStatusEventArgs>? PlaybackStatusChanged;
     public event EventHandler<PlaybackProgressEventArgs>? PlaybackProgressChanged;
 
     public AudioPlayer()
     {
         Task.Run(WarmUpWasapiAsync);
+    }
+
+    public void SetEqualizerBand(int bandIndex, float gainDb)
+    {
+        if (bandIndex >= 0 && bandIndex < _equalizerBands.Length)
+        {
+            _equalizerBands[bandIndex] = Math.Clamp(gainDb, -12f, 12f);
+
+            if (_equalizer != null && bandIndex < _equalizer.SampleFilters.Count)
+            {
+                _equalizer.SampleFilters[bandIndex].AverageGainDB = _equalizerBands[bandIndex];
+            }
+        }
+    }
+
+    public float GetEqualizerBand(int bandIndex)
+    {
+        if (bandIndex >= 0 && bandIndex < _equalizerBands.Length)
+        {
+            return _equalizerBands[bandIndex];
+        }
+
+        return 0f;
+    }
+
+    public void ResetEqualizer()
+    {
+        for (int i = 0; i < _equalizerBands.Length; i++)
+        {
+            _equalizerBands[i] = 0f;
+            if (_equalizer != null && i < _equalizer.SampleFilters.Count)
+            {
+                _equalizer.SampleFilters[i].AverageGainDB = 0f;
+            }
+        }
     }
 
     private async Task WarmUpWasapiAsync()
@@ -135,11 +179,21 @@ internal sealed class AudioPlayer : IAudioPlayer
                 {
                     _waveSource = CodecFactory.Instance.GetCodec(_currentFilePath);
 
+                    _sampleSource = _waveSource.ToSampleSource();
+
+                    _equalizer = Equalizer.Create10BandEqualizer(_sampleSource);
+                    for (int i = 0; i < _equalizerBands.Length && i < _equalizer.SampleFilters.Count; i++)
+                    {
+                        _equalizer.SampleFilters[i].AverageGainDB = _equalizerBands[i];
+                    }
+
+                    var finalSource = _equalizer.ToWaveSource();
+
                     var wasapiOut = new WasapiOut { Latency = 100 };
                     _soundOut = wasapiOut;
 
                     _soundOut.Stopped += OnPlaybackStopped;
-                    _soundOut.Initialize(_waveSource);
+                    _soundOut.Initialize(finalSource);
                     _soundOut.Volume = _volume;
 
                     await Task.Delay(50, token).ConfigureAwait(false);
@@ -277,6 +331,12 @@ internal sealed class AudioPlayer : IAudioPlayer
         }
     }
 
+    public async Task SetPlaybackSpeedAsync(float speed, CancellationToken cancellationToken = default)
+    {
+        await Task.CompletedTask;
+        Debug.WriteLine($"Playback speed change requested: {speed}x (not implemented)");
+    }
+
     private void StartProgressTimer()
     {
         StopProgressTimer();
@@ -344,6 +404,9 @@ internal sealed class AudioPlayer : IAudioPlayer
 
                 _soundOut = null;
             }
+
+            _equalizer = null;
+            _sampleSource = null;
 
             if (_waveSource != null)
             {

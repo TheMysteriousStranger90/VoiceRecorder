@@ -1,14 +1,19 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using VoiceRecorder.Interfaces;
+using VoiceRecorder.Models.Enums;
+using VoiceRecorder.Models.Events;
 using VoiceRecorder.ViewModels;
 
 namespace VoiceRecorder.Views;
 
+[SuppressMessage("Design", "CA1515:Consider making public types internal",
+    Justification = "Window class used across assemblies")]
 public partial class MainWindow : Window
 {
     private readonly IThemeService _themeService;

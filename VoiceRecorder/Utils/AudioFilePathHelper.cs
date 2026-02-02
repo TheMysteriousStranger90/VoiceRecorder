@@ -1,23 +1,19 @@
 ﻿using System.Globalization;
-using System.Text.RegularExpressions;
+using VoiceRecorder.Models;
+using VoiceRecorder.Models.Enums;
 
 namespace VoiceRecorder.Utils;
 
-public static partial class AudioFilePathHelper
+internal static partial class AudioFilePathHelper
 {
-    [GeneratedRegex(@"[<>:""/\\|?*]", RegexOptions.Compiled)]
-    private static partial Regex InvalidFileNameCharsRegex();
-
-    public static string GenerateAudioFilePath(string deviceName)
+    public static string GenerateAudioFilePath(string deviceName, OutputFormat format = OutputFormat.Wav)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(deviceName);
-
         string basePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "AzioVoiceRecorder");
 
-        string sanitizedDeviceName = SanitizeFileName(deviceName);
-        string deviceFolder = Path.Combine(basePath, sanitizedDeviceName);
+        string safeDeviceName = SanitizeDeviceName(deviceName);
+        string deviceFolder = Path.Combine(basePath, safeDeviceName);
 
         if (!Directory.Exists(deviceFolder))
         {
@@ -25,25 +21,48 @@ public static partial class AudioFilePathHelper
         }
 
         string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
-        string fileName = $"Recording_{timestamp}.wav";
+        string extension = GetExtensionForFormat(format);
+        string fileName = $"Recording_{timestamp}{extension}";
 
         return Path.Combine(deviceFolder, fileName);
     }
 
-    private static string SanitizeFileName(string fileName)
+    public static string GenerateAudioFilePath(string deviceName, AudioSettings settings)
     {
-        if (string.IsNullOrWhiteSpace(fileName))
+        return GenerateAudioFilePath(deviceName, settings.OutputFormat);
+    }
+
+    private static string GetExtensionForFormat(OutputFormat format)
+    {
+        return format switch
         {
-            return "Default";
+            OutputFormat.Wav => ".wav",
+            OutputFormat.Mp3 => ".mp3",
+            OutputFormat.Aac => ".m4a",
+            OutputFormat.Flac => ".flac",
+            _ => ".wav"
+        };
+    }
+
+    private static string SanitizeDeviceName(string deviceName)
+    {
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            return "Unknown";
         }
 
-        string sanitized = InvalidFileNameCharsRegex().Replace(fileName, "_");
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+        string sanitized = new(deviceName
+            .Select(c => invalidChars.Contains(c) ? '_' : c)
+            .ToArray());
+
+        sanitized = sanitized.Trim().TrimEnd('.');
 
         if (sanitized.Length > 50)
         {
             sanitized = sanitized[..50];
         }
 
-        return sanitized.Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "Unknown" : sanitized;
     }
 }

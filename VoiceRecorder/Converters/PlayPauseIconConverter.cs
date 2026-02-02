@@ -6,7 +6,7 @@ using VoiceRecorder.Models;
 
 namespace VoiceRecorder.Converters;
 
-public class PlayPauseIconConverter : IMultiValueConverter
+internal sealed class PlayPauseIconConverter : IMultiValueConverter
 {
     public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
     {

@@ -3,6 +3,8 @@ using System.Windows.Input;
 using ReactiveUI;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Models.Enums;
+using VoiceRecorder.Models.Events;
 using VoiceRecorder.Services;
 
 namespace VoiceRecorder.ViewModels;

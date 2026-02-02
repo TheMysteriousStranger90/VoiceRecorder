@@ -8,9 +8,9 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
 using VoiceRecorder.Exceptions;
-using VoiceRecorder.Filters;
 using VoiceRecorder.Interfaces;
 using VoiceRecorder.Models;
+using VoiceRecorder.Models.Events;
 using VoiceRecorder.Services;
 using VoiceRecorder.Utils;
 
@@ -21,25 +21,32 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly IAudioRecorder _recorder;
     private readonly IAudioDevice _deviceService;
-    private readonly Stopwatch _stopwatch = new();
     private readonly CompositeDisposable _disposables = new();
     private IDisposable? _timerSubscription;
-    private System.Threading.Timer? _displayTimer;
     private string _timerText = "00:00:00";
     private bool _isRecording;
+    private bool _isPaused;
     private VoiceFilterViewModel _selectedFilterViewModel;
     private string _selectedDevice = string.Empty;
     private string _statusMessage = "Ready";
     private string _filterTooltip = "Select an audio filter";
     private string _deviceTooltip = "Select a recording device";
     private float[] _audioSamples = [];
+    private float _peakLevel;
+    private float _averageLevel;
+    private string _recordingSize = "0 KB";
+    private AudioDeviceInfo? _selectedDeviceInfo;
 
     public ObservableCollection<VoiceFilterViewModel> AvailableFilters { get; }
-    public ObservableCollection<string> AvailableDevices { get; } = new();
+    public ObservableCollection<string> AvailableDevices { get; } = [];
+    public ObservableCollection<AudioDeviceInfo> AvailableDevicesInfo { get; } = [];
 
     public ICommand StartRecordingCommand { get; }
     public ICommand StopRecordingCommand { get; }
+    public ICommand PauseRecordingCommand { get; }
+    public ICommand ResumeRecordingCommand { get; }
     public ICommand OpenFolderCommand { get; }
+    public ICommand RefreshDevicesCommand { get; }
 
     public string StatusMessage
     {
@@ -57,6 +64,12 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool IsPaused
+    {
+        get => _isPaused;
+        set => this.RaiseAndSetIfChanged(ref _isPaused, value);
+    }
+
     public string TimerText
     {
         get => _timerText;
@@ -66,13 +79,30 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     public VoiceFilterViewModel SelectedFilterViewModel
     {
         get => _selectedFilterViewModel;
-        set => this.RaiseAndSetIfChanged(ref _selectedFilterViewModel, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedFilterViewModel, value);
+            UpdateFilterTooltip();
+        }
     }
 
     public string SelectedDevice
     {
         get => _selectedDevice;
         set => this.RaiseAndSetIfChanged(ref _selectedDevice, value);
+    }
+
+    public AudioDeviceInfo? SelectedDeviceInfo
+    {
+        get => _selectedDeviceInfo;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedDeviceInfo, value);
+            if (value != null)
+            {
+                SelectedDevice = value.Name;
+            }
+        }
     }
 
     public string FilterTooltip
@@ -93,6 +123,24 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _audioSamples, value);
     }
 
+    public float PeakLevel
+    {
+        get => _peakLevel;
+        private set => this.RaiseAndSetIfChanged(ref _peakLevel, value);
+    }
+
+    public float AverageLevel
+    {
+        get => _averageLevel;
+        private set => this.RaiseAndSetIfChanged(ref _averageLevel, value);
+    }
+
+    public string RecordingSize
+    {
+        get => _recordingSize;
+        private set => this.RaiseAndSetIfChanged(ref _recordingSize, value);
+    }
+
     public RecordingViewModel(
         IAudioRecorder? recorder = null,
         IAudioDevice? deviceService = null,
@@ -104,16 +152,19 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
 
         _recorder.AudioDataAvailable += OnAudioDataAvailable;
         _recorder.RecordingStarted += OnRecordingStarted;
+        _recorder.AudioLevelChanged += OnAudioLevelChanged;
+        _recorder.RecordingProgressChanged += OnRecordingProgressChanged;
 
-        AvailableFilters =
-        [
-            new VoiceFilterViewModel(null),
-            new VoiceFilterViewModel(new EchoFilter()),
-            new VoiceFilterViewModel(new FlangerFilter()),
-            new VoiceFilterViewModel(new DistortionFilter()),
-            new VoiceFilterViewModel(new ChorusFilter()),
-            new VoiceFilterViewModel(new CompressorFilter())
-        ];
+        if (_deviceService is AudioDevice audioDevice)
+        {
+            audioDevice.DeviceChanged += OnDeviceChanged;
+            audioDevice.DeviceRemoved += OnDeviceRemoved;
+            audioDevice.DefaultDeviceChanged += OnDefaultDeviceChanged;
+        }
+
+        AvailableFilters = new ObservableCollection<VoiceFilterViewModel>(
+            VoiceFilterViewModel.GetAvailableFilters());
+
         _selectedFilterViewModel = AvailableFilters[0];
 
         var canStartRecording = this.WhenAnyValue(
@@ -122,10 +173,15 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             (isRecording, device) => !isRecording && !string.IsNullOrEmpty(device));
 
         var canStopRecording = this.WhenAnyValue(x => x.IsRecording);
+        var canPauseRecording = this.WhenAnyValue(x => x.IsRecording, x => x.IsPaused, (r, p) => r && !p);
+        var canResumeRecording = this.WhenAnyValue(x => x.IsRecording, x => x.IsPaused, (r, p) => r && p);
 
         StartRecordingCommand = ReactiveCommand.CreateFromTask(StartRecordingAsync, canStartRecording);
         StopRecordingCommand = ReactiveCommand.CreateFromTask(StopRecordingAsync, canStopRecording);
+        PauseRecordingCommand = ReactiveCommand.CreateFromTask(PauseRecordingAsync, canPauseRecording);
+        ResumeRecordingCommand = ReactiveCommand.CreateFromTask(ResumeRecordingAsync, canResumeRecording);
         OpenFolderCommand = ReactiveCommand.CreateFromTask(OpenFolderAsync);
+        RefreshDevicesCommand = ReactiveCommand.CreateFromTask(LoadDevicesAsync);
 
         this.WhenAnyValue(x => x.SelectedDevice)
             .Where(device => !string.IsNullOrEmpty(device))
@@ -142,32 +198,76 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         Dispatcher.UIThread.Post(() => AudioSamples = e.Samples);
     }
 
+    private void OnAudioLevelChanged(object? sender, AudioLevelEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            PeakLevel = e.PeakLevel;
+            AverageLevel = e.AverageLevel;
+        });
+    }
+
+    private void OnRecordingProgressChanged(object? sender, RecordingProgressEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() => { RecordingSize = e.FormattedSize; });
+    }
+
+    private void OnDeviceChanged(object? sender, AudioDeviceChangedEventArgs e)
+    {
+        Debug.WriteLine($"Device changed: {e.DeviceId}");
+        Dispatcher.UIThread.Post(async () => await LoadDevicesAsync().ConfigureAwait(false));
+    }
+
+    private void OnDeviceRemoved(object? sender, AudioDeviceChangedEventArgs e)
+    {
+        Debug.WriteLine($"Device removed: {e.DeviceId}");
+        Dispatcher.UIThread.Post(async () =>
+        {
+            await LoadDevicesAsync().ConfigureAwait(false);
+
+            if (IsRecording)
+            {
+                var isAvailable = await _deviceService.IsDeviceAvailableAsync(SelectedDevice).ConfigureAwait(false);
+                if (!isAvailable)
+                {
+                    StatusMessage = "Recording device disconnected!";
+                    await StopRecordingAsync().ConfigureAwait(false);
+                }
+            }
+        });
+    }
+
+    private void OnDefaultDeviceChanged(object? sender, AudioDeviceChangedEventArgs e)
+    {
+        Debug.WriteLine($"Default device changed: {e.DeviceId}");
+        Dispatcher.UIThread.Post(async () => await LoadDevicesAsync().ConfigureAwait(false));
+    }
+
     private async Task LoadDevicesAsync()
     {
         try
         {
-            var devices = await _deviceService.GetAvailableDevicesAsync().ConfigureAwait(false);
+            var devicesInfo = await _deviceService.GetAvailableDevicesWithInfoAsync().ConfigureAwait(false);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 AvailableDevices.Clear();
-                foreach (var device in devices)
-                {
-                    AvailableDevices.Add(device);
-                }
-            });
+                AvailableDevicesInfo.Clear();
 
-            var defaultDeviceName = await _deviceService.GetDefaultDeviceNameAsync().ConfigureAwait(false);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (!string.IsNullOrEmpty(defaultDeviceName) && AvailableDevices.Contains(defaultDeviceName))
+                foreach (var device in devicesInfo)
                 {
-                    SelectedDevice = defaultDeviceName;
+                    AvailableDevices.Add(device.Name);
+                    AvailableDevicesInfo.Add(device);
                 }
-                else if (AvailableDevices.Count > 0)
+
+                var defaultDevice = devicesInfo.FirstOrDefault(d => d.IsDefault);
+                if (defaultDevice != null)
                 {
-                    SelectedDevice = AvailableDevices[0];
+                    SelectedDeviceInfo = defaultDevice;
+                }
+                else if (devicesInfo.Count > 0)
+                {
+                    SelectedDeviceInfo = devicesInfo[0];
                 }
             });
         }
@@ -207,14 +307,15 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice);
+            var settings = _settingsService.LoadSettings();
+
+            string filePath = AudioFilePathHelper.GenerateAudioFilePath(SelectedDevice, settings);
+
             string? directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
-
-            var settings = _settingsService.LoadSettings();
 
             await _recorder.StartRecordingAsync(
                 filePath,
@@ -224,17 +325,29 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsRecording = true;
+                IsPaused = false;
+                RecordingSize = "0 KB";
+
+                var filterInfo = SelectedFilterViewModel?.FilterStrategy != null
+                    ? $" with {SelectedFilterViewModel.DisplayName}"
+                    : string.Empty;
+
                 StatusMessage =
-                    $"Recording: {Path.GetFileName(filePath)} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
+                    $"Recording: {Path.GetFileName(filePath)}{filterInfo} [{settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch]";
             });
         }
         catch (AudioDeviceException ex)
         {
             await HandleRecordingErrorAsync(ex.Message);
         }
+        catch (NotSupportedException ex)
+        {
+            await HandleRecordingErrorAsync($"Format not supported: {ex.Message}");
+        }
         catch (UnauthorizedAccessException)
         {
-            await HandleRecordingErrorAsync("Microphone access denied! Please allow microphone access in Windows Privacy Settings.");
+            await HandleRecordingErrorAsync(
+                "Microphone access denied! Please allow microphone access in Windows Privacy Settings.");
         }
         catch (InvalidOperationException ex)
         {
@@ -247,14 +360,52 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task PauseRecordingAsync()
+    {
+        try
+        {
+            await _recorder.PauseRecordingAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsPaused = true;
+                StatusMessage = "Recording paused";
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Pause error: {ex}");
+            await Dispatcher.UIThread.InvokeAsync(() => StatusMessage = $"Failed to pause: {ex.Message}");
+        }
+    }
+
+    private async Task ResumeRecordingAsync()
+    {
+        try
+        {
+            await _recorder.ResumeRecordingAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsPaused = false;
+                StatusMessage = "Recording resumed";
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Resume error: {ex}");
+            await Dispatcher.UIThread.InvokeAsync(() => StatusMessage = $"Failed to resume: {ex.Message}");
+        }
+    }
+
     private async Task HandleRecordingErrorAsync(string message)
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             StatusMessage = message;
             IsRecording = false;
-            StopDisplayTimer();
-            _stopwatch.Stop();
+            IsPaused = false;
+            StopTimerSubscription();
         });
     }
 
@@ -263,15 +414,18 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         try
         {
             var finalDuration = TimerText;
+            var finalSize = RecordingSize;
 
             await _recorder.StopRecordingAsync().ConfigureAwait(false);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                StopTimerSubscription();
                 IsRecording = false;
-                StatusMessage = $"Saved. Duration: {finalDuration}";
+                IsPaused = false;
+                PeakLevel = 0;
+                AverageLevel = 0;
+                StatusMessage = $"Saved. Duration: {finalDuration}, Size: {finalSize}";
             });
         }
         catch (OperationCanceledException)
@@ -279,8 +433,8 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsRecording = false;
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                IsPaused = false;
+                StopTimerSubscription();
                 StatusMessage = "Recording stopped";
             });
         }
@@ -291,8 +445,8 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsRecording = false;
-                StopDisplayTimer();
-                _stopwatch.Stop();
+                IsPaused = false;
+                StopTimerSubscription();
                 StatusMessage = $"Error saving recording: {ex.Message}";
             });
         }
@@ -337,8 +491,24 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            FilterTooltip = "Select an audio filter";
+            UpdateFilterTooltip();
             DeviceTooltip = "Select a recording device";
+        }
+    }
+
+    private void UpdateFilterTooltip()
+    {
+        if (_isRecording)
+        {
+            FilterTooltip = "Cannot change filter during recording";
+        }
+        else if (_selectedFilterViewModel?.FilterStrategy != null)
+        {
+            FilterTooltip = $"{_selectedFilterViewModel.DisplayName}: {_selectedFilterViewModel.Description}";
+        }
+        else
+        {
+            FilterTooltip = "No audio effect applied";
         }
     }
 
@@ -346,55 +516,58 @@ internal sealed class RecordingViewModel : ViewModelBase, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            _stopwatch.Restart();
             TimerText = "00:00:00";
-            StartDisplayTimer();
+            StartTimerSubscription();
         });
     }
 
-    private void StartDisplayTimer()
+    private void StartTimerSubscription()
     {
-        StopDisplayTimer();
+        StopTimerSubscription();
 
-        _displayTimer = new System.Threading.Timer(
-            callback: _ => UpdateTimerDisplay(),
-            state: null,
-            dueTime: TimeSpan.Zero,
-            period: TimeSpan.FromMilliseconds(500));
+        _timerSubscription = Observable
+            .Interval(TimeSpan.FromMilliseconds(100))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => UpdateTimerFromRecorder());
     }
 
-    private void StopDisplayTimer()
+    private void StopTimerSubscription()
     {
-        _displayTimer?.Dispose();
-        _displayTimer = null;
         _timerSubscription?.Dispose();
         _timerSubscription = null;
     }
 
-    private void UpdateTimerDisplay()
+    private void UpdateTimerFromRecorder()
     {
-        if (!_stopwatch.IsRunning)
+        if (!IsRecording || IsPaused)
         {
             return;
         }
 
-        var elapsed = _stopwatch.Elapsed;
+        var elapsed = _recorder.RecordingDuration;
         var text = elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
 
-        Dispatcher.UIThread.Post(() =>
+        if (TimerText != text)
         {
-            if (IsRecording)
-            {
-                TimerText = text;
-            }
-        });
+            TimerText = text;
+        }
     }
 
     public void Dispose()
     {
         _recorder.AudioDataAvailable -= OnAudioDataAvailable;
         _recorder.RecordingStarted -= OnRecordingStarted;
-        StopDisplayTimer();
+        _recorder.AudioLevelChanged -= OnAudioLevelChanged;
+        _recorder.RecordingProgressChanged -= OnRecordingProgressChanged;
+
+        if (_deviceService is AudioDevice audioDevice)
+        {
+            audioDevice.DeviceChanged -= OnDeviceChanged;
+            audioDevice.DeviceRemoved -= OnDeviceRemoved;
+            audioDevice.DefaultDeviceChanged -= OnDefaultDeviceChanged;
+        }
+
+        StopTimerSubscription();
         _disposables.Dispose();
         _recorder.Dispose();
         GC.SuppressFinalize(this);
