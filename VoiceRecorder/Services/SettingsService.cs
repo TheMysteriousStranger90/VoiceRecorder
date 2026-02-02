@@ -8,9 +8,16 @@ internal sealed class SettingsService : ISettingsService
 {
     private readonly string _settingsPath;
 
-    private static readonly JsonSerializerOptions _serializerOptions = new()
+    private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true
+    };
+
+    private static readonly JsonSerializerOptions DeserializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
     };
 
     public SettingsService()
@@ -34,12 +41,17 @@ internal sealed class SettingsService : ISettingsService
             if (File.Exists(_settingsPath))
             {
                 string json = File.ReadAllText(_settingsPath);
-                var settings = JsonSerializer.Deserialize<AudioSettings>(json);
+                var settings = JsonSerializer.Deserialize<AudioSettings>(json, DeserializerOptions);
+
                 if (settings != null && settings.IsValid())
                 {
                     return settings;
                 }
             }
+        }
+        catch (JsonException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Settings JSON error: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -55,7 +67,7 @@ internal sealed class SettingsService : ISettingsService
         {
             if (settings.IsValid())
             {
-                string json = JsonSerializer.Serialize(settings, _serializerOptions);
+                string json = JsonSerializer.Serialize(settings, SerializerOptions);
                 File.WriteAllText(_settingsPath, json);
             }
         }

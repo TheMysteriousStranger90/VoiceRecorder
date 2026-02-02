@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
 using CSCore;
 using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
@@ -25,16 +24,23 @@ internal sealed class AudioRecorder : IAudioRecorder
 
     private readonly SemaphoreSlim _recordingLock = new(1, 1);
     private readonly object _writerLock = new();
+    private readonly object _stateLock = new();
     private bool _disposed;
     private volatile bool _isWriting;
+    private volatile bool _isInitialized;
     private byte[]? _readBuffer;
     private long _bytesWritten;
     private readonly Stopwatch _recordingStopwatch = new();
+    private readonly ManualResetEventSlim _captureReadyEvent = new(false);
 
-    // Audio level monitoring
     private float _peakLevel;
     private float _averageLevel;
     private readonly object _levelLock = new();
+
+    private const int PreRollBufferMs = 500;
+    private byte[]? _preRollBuffer;
+    private int _preRollBytesWritten;
+    private volatile bool _isPreRolling;
 
     public IWaveSource? CaptureSource => _soundInSource;
     public bool IsRecording { get; private set; }
@@ -127,7 +133,10 @@ internal sealed class AudioRecorder : IAudioRecorder
             CleanupRecordingResources();
             ResetMetrics();
 
-            // Initialize capture with optimized settings
+            _captureReadyEvent.Reset();
+            _isInitialized = false;
+            _isPreRolling = true;
+
             _capture = new WasapiCapture(false, AudioClientShareMode.Shared, 50)
             {
                 Device = _currentDevice
@@ -140,21 +149,34 @@ internal sealed class AudioRecorder : IAudioRecorder
 
             _processedSource = BuildProcessingChain(_soundInSource, filter, settings);
 
-            // Optimize buffer size based on format
             int bufferSize = CalculateOptimalBufferSize(_processedSource.WaveFormat);
             _readBuffer = new byte[bufferSize];
 
-            // Create appropriate writer based on file extension
+            int preRollBufferSize = (_processedSource.WaveFormat.BytesPerSecond * PreRollBufferMs) / 1000;
+            _preRollBuffer = new byte[preRollBufferSize];
+            _preRollBytesWritten = 0;
+
             _writerDisposable = CreateWriter(outputFilePath, _processedSource.WaveFormat) as IDisposable;
+
+            if (filter != null)
+            {
+                PrimeFilterChain(_processedSource, bufferSize);
+            }
 
             _soundInSource.DataAvailable += OnDataAvailable;
 
-            _isWriting = true;
-            IsRecording = true;
-            _bytesWritten = 0;
-            _recordingStopwatch.Restart();
+            lock (_stateLock)
+            {
+                _isWriting = true;
+                IsRecording = true;
+                _bytesWritten = 0;
+            }
 
             _capture.Start();
+
+            await WaitForCaptureReadyAsync(cancellationToken).ConfigureAwait(false);
+
+            _recordingStopwatch.Restart();
 
             Debug.WriteLine("Recording started successfully");
 
@@ -201,6 +223,84 @@ internal sealed class AudioRecorder : IAudioRecorder
         finally
         {
             _recordingLock.Release();
+        }
+    }
+
+    private async Task WaitForCaptureReadyAsync(CancellationToken cancellationToken)
+    {
+        const int maxWaitMs = 2000;
+        const int checkIntervalMs = 10;
+        int waited = 0;
+
+        while (!_isInitialized && waited < maxWaitMs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Delay(checkIntervalMs, cancellationToken).ConfigureAwait(false);
+            waited += checkIntervalMs;
+        }
+
+        if (!_isInitialized)
+        {
+            Debug.WriteLine("Warning: Capture ready timeout, proceeding anyway");
+        }
+        else
+        {
+            Debug.WriteLine($"Capture ready after {waited}ms");
+        }
+
+        _isPreRolling = false;
+
+        FlushPreRollBuffer();
+    }
+
+    private void FlushPreRollBuffer()
+    {
+        if (_preRollBuffer == null || _preRollBytesWritten == 0)
+        {
+            return;
+        }
+
+        lock (_writerLock)
+        {
+            if (_isWriting && _writerDisposable != null)
+            {
+                try
+                {
+                    WriteToOutput(_preRollBuffer, 0, _preRollBytesWritten);
+                    Interlocked.Add(ref _bytesWritten, _preRollBytesWritten);
+                    Debug.WriteLine($"Flushed {_preRollBytesWritten} bytes from pre-roll buffer");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error flushing pre-roll buffer: {ex.Message}");
+                }
+            }
+        }
+
+        _preRollBytesWritten = 0;
+    }
+
+    private static void PrimeFilterChain(IWaveSource processedSource, int bufferSize)
+    {
+        try
+        {
+            byte[] primeBuffer = new byte[bufferSize];
+            int primeSamples = 0;
+            int maxPrimeSamples = 3;
+
+            while (primeSamples < maxPrimeSamples)
+            {
+                int read = processedSource.Read(primeBuffer, 0, primeBuffer.Length);
+                if (read <= 0)
+                    break;
+                primeSamples++;
+            }
+
+            Debug.WriteLine($"Filter chain primed with {primeSamples} buffer reads");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error priming filter chain: {ex.Message}");
         }
     }
 
@@ -275,6 +375,7 @@ internal sealed class AudioRecorder : IAudioRecorder
     private void ResetMetrics()
     {
         _bytesWritten = 0;
+        _recordingStopwatch.Reset();
         lock (_levelLock)
         {
             _peakLevel = 0;
@@ -314,7 +415,8 @@ internal sealed class AudioRecorder : IAudioRecorder
                     ? processedSource.ToMono()
                     : processedSource.ToStereo();
 
-                Debug.WriteLine($"Applied settings: {settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch");
+                Debug.WriteLine(
+                    $"Applied settings: {settings.SampleRate}Hz, {settings.BitsPerSample}bit, {settings.Channels}ch");
             }
             catch (Exception ex)
             {
@@ -328,27 +430,61 @@ internal sealed class AudioRecorder : IAudioRecorder
 
     private void OnDataAvailable(object? sender, DataAvailableEventArgs e)
     {
-        if (!_isWriting || _processedSource == null || _readBuffer == null)
+        bool shouldWrite;
+        lock (_stateLock)
+        {
+            shouldWrite = _isWriting;
+        }
+
+        if (!shouldWrite || _processedSource == null || _readBuffer == null)
         {
             return;
+        }
+
+        if (!_isInitialized)
+        {
+            _isInitialized = true;
+            _captureReadyEvent.Set();
         }
 
         try
         {
             int bytesRead;
 
-            while (_isWriting && (bytesRead = _processedSource.Read(_readBuffer, 0, _readBuffer.Length)) > 0)
+            while (shouldWrite && (bytesRead = _processedSource.Read(_readBuffer, 0, _readBuffer.Length)) > 0)
             {
-                lock (_writerLock)
+                lock (_stateLock)
                 {
-                    if (_isWriting && _writerDisposable != null)
+                    shouldWrite = _isWriting;
+                }
+
+                if (!shouldWrite)
+                    break;
+
+                if (_isPreRolling && _preRollBuffer != null)
+                {
+                    int availableSpace = _preRollBuffer.Length - _preRollBytesWritten;
+                    int bytesToCopy = Math.Min(bytesRead, availableSpace);
+
+                    if (bytesToCopy > 0)
                     {
-                        WriteToOutput(_readBuffer, 0, bytesRead);
-                        Interlocked.Add(ref _bytesWritten, bytesRead);
+                        Buffer.BlockCopy(_readBuffer, 0, _preRollBuffer, _preRollBytesWritten, bytesToCopy);
+                        _preRollBytesWritten += bytesToCopy;
                     }
-                    else
+                }
+                else
+                {
+                    lock (_writerLock)
                     {
-                        break;
+                        if (_isWriting && _writerDisposable != null)
+                        {
+                            WriteToOutput(_readBuffer, 0, bytesRead);
+                            Interlocked.Add(ref _bytesWritten, bytesRead);
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
 
@@ -489,8 +625,12 @@ internal sealed class AudioRecorder : IAudioRecorder
             if (!IsRecording)
                 return;
 
-            _isWriting = false;
-            IsRecording = false;
+            lock (_stateLock)
+            {
+                _isWriting = false;
+                IsRecording = false;
+            }
+
             _recordingStopwatch.Stop();
 
             if (_capture != null)
@@ -527,7 +667,11 @@ internal sealed class AudioRecorder : IAudioRecorder
             if (!IsRecording || !_isWriting)
                 return;
 
-            _isWriting = false;
+            lock (_stateLock)
+            {
+                _isWriting = false;
+            }
+
             _recordingStopwatch.Stop();
             Debug.WriteLine("Recording paused");
         }
@@ -545,7 +689,11 @@ internal sealed class AudioRecorder : IAudioRecorder
             if (!IsRecording || _isWriting)
                 return;
 
-            _isWriting = true;
+            lock (_stateLock)
+            {
+                _isWriting = true;
+            }
+
             _recordingStopwatch.Start();
             Debug.WriteLine("Recording resumed");
         }
@@ -575,7 +723,12 @@ internal sealed class AudioRecorder : IAudioRecorder
 
     private void CleanupRecordingResources()
     {
-        _isWriting = false;
+        lock (_stateLock)
+        {
+            _isWriting = false;
+            _isInitialized = false;
+            _isPreRolling = false;
+        }
 
         if (_soundInSource != null)
         {
@@ -604,6 +757,8 @@ internal sealed class AudioRecorder : IAudioRecorder
         _soundInSource = null;
 
         _readBuffer = null;
+        _preRollBuffer = null;
+        _preRollBytesWritten = 0;
 
         DisposeWriter();
     }
@@ -638,6 +793,7 @@ internal sealed class AudioRecorder : IAudioRecorder
 
         CleanupRecordingResources();
         _recordingLock.Dispose();
+        _captureReadyEvent.Dispose();
 
         _disposed = true;
         GC.SuppressFinalize(this);
